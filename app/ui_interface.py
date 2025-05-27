@@ -87,9 +87,9 @@ def vehicle_access_interface():
             empresa = st.text_input("Empresa:")
             status = st.selectbox("Status de Entrada", ["Autorizada", "Bloqueada"], index=0)
             motivo = st.text_input("Motivo do Bloqueio") if status == "Bloqueada" else ""
-            aprovador = st.text_input("Aprovador") if status == "Autorizada" else ""
+            aprovador = st.text_input("Aprovador") if status == "Autorizado" else ""
 
-            if status == "Bloqueada":
+            if status == "Bloqueado":
                 st.warning("A liberação só pode ser feita pelo responsável pela segurança ou gerente.")
 
             if st.button("Adicionar Registro"):
