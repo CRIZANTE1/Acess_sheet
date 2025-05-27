@@ -39,7 +39,7 @@ def round_to_nearest_interval(time_value, interval=1):
     return rounded_time.strftime("%H:%M")
 
 def vehicle_access_interface():
-    st.title("Controle de Acesso de Veículos")
+    st.title("Controle de Acesso BAERI")
     
     # BRIEFING DE SEGURANGA
     with st.expander('Briefing de segurança', expanded=True):
