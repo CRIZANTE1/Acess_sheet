@@ -3,12 +3,12 @@ import pandas as pd
 from app.ui_interface import vehicle_access_interface
 from app.data_operations import mouth_consult
 from app.admin_page import admin_page
-from app.summary_page import summary_page # Importar a nova página de resumo
+from app.summary_page import summary_page 
 from auth.login_page import show_login_page, show_user_header, show_logout_button
 from auth.auth_utils import is_user_logged_in, get_user_display_name, is_admin
 from app.operations import SheetOperations
 
-st.set_page_config(page_title="Controle de Integração", layout="wide")
+st.set_page_config(page_title="Controle de Acesso BAERI", layout="wide")
 
 def load_data_from_sheets():
     if "df_acesso_veiculos" not in st.session_state:
