@@ -280,7 +280,7 @@ def get_block_info(df, name):
         tuple: Contém o número de bloqueios e uma lista de motivos.
     """
     person_records = df[df["Nome"] == name]
-    blocked_records = person_records[person_records["Status da Entrada"] == "Bloqueada"]
+    blocked_records = person_records[person_records["Status da Entrada"] == "Bloqueado"]
     num_blocks = len(blocked_records)
     reasons = blocked_records["Motivo do Bloqueio"].dropna().unique()
     
