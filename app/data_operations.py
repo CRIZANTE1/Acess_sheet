@@ -264,7 +264,8 @@ def check_blocked_records(df):
         for _, row in blocked_records.iterrows()
         if should_show_block(row)
     ])
-
+    
+    return blocked_info if blocked_info else None
 
 def get_block_info(df, name):
     """
