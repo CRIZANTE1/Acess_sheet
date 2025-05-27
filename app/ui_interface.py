@@ -292,7 +292,7 @@ def blocks():
     blocked_info = check_blocked_records(df_current)
     
     if blocked_info:
-        st.error("Registros Bloqueadas:\n" + blocked_info)
+        st.error("Registros Bloqueados:\n" + blocked_info)
     else:
         st.empty()
 
