@@ -41,7 +41,7 @@ def main():
         if page == "Controle de Acesso":
             vehicle_access_interface()
             mouth_consult()
-        elif page == "Configurações do sistema":
+        elif page == "Configurações do Sistema":
             if user_is_admin:
                 admin_page()
             else:
