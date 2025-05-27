@@ -77,14 +77,13 @@ Este sistema gerencia o controle de acesso de visitantes e veículos, utilizando
 │   ├── operations.py       # Classe SheetOperations para interação com Google Sheets
 │   ├── sheets_api.py       # Funções de conexão com Google Sheets
 │   ├── ui_interface.py       # Interface do usuário
-│   └── credentials/        # Contém credenciais (localmente)
-│       └── cred.json
+│  
 ├── auth/                   # Módulo de autenticação
 │   ├── __init__.py
 │   ├── auth_utils.py       # Funções auxiliares de autenticação
 │   └── login_page.py       # Página de login
 ├── data/
-│   └── NOVO BRIEFING BAERI 2023.mp4 # Vídeo de briefing
+│   └── NOVO BRIEFING.mp4 # Vídeo de briefing
 ├── .streamlit/             # Configurações do Streamlit
 │   └── secrets.toml        # Segredos e configurações OIDC
 ├── main.py                 # Ponto de entrada da aplicação
