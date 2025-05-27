@@ -34,14 +34,14 @@ def main():
         
         page_options = ["Controle de Acesso"]
         if user_is_admin:
-            page_options.append("Cadastro de Usuário")
+            page_options.append("Configurações do Sistema")
         
         page = st.sidebar.selectbox("Escolha a página:", page_options)
         
         if page == "Controle de Acesso":
             vehicle_access_interface()
             mouth_consult()
-        elif page == "Cadastro de Usuário":
+        elif page == "Configurações do sistema":
             if user_is_admin:
                 admin_page()
             else:
