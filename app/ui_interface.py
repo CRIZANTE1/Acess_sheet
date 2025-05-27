@@ -275,7 +275,7 @@ def vehicle_access_interface():
                 st.warning(f"Não há registros encontrados para o status {status_filter} e empresa {empresa_filter}.")
          
     # Exibir tabela editável
-    st.write("Colunas do DataFrame antes do data_editor:", st.session_state.df_acesso_veiculos.columns.tolist())
+    
     df = st.data_editor(st.session_state.df_acesso_veiculos.fillna(""), num_rows="dynamic")
     st.session_state.df_acesso_veiculos = df
 
