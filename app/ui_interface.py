@@ -50,7 +50,7 @@ def vehicle_access_interface():
                  "4. Mantenha sempre os dados atualizados e verifique as informações antes de liberar o acesso."
                  "\n5. Sempre que for a primeira vez do visitante ou um ano do acesso repassar o video.\n")
         try: # Adicionar vídeo
-            st.video(r"data\NOVO BRIEFING BAERI 2023.mp4")
+            st.video("https://youtu.be/QqUkeTucwkI")
         except Exception as e:
             st.error(f"Erro ao carregar o vídeo: {e}")
 
