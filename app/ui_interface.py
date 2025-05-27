@@ -85,8 +85,8 @@ def vehicle_access_interface():
             data = st.date_input("Data:")
             horario_entrada = st.selectbox("Horário de Entrada:", options=horario_options, index=horario_options.index(default_horario))
             empresa = st.text_input("Empresa:")
-            status = st.selectbox("Status de Entrada", ["Autorizada", "Bloqueada"], index=0)
-            motivo = st.text_input("Motivo do Bloqueio") if status == "Bloqueada" else ""
+            status = st.selectbox("Status de Entrada", ["Autorizado", "Bloqueado"], index=0)
+            motivo = st.text_input("Motivo do Bloqueio") if status == "Bloqueado" else ""
             aprovador = st.text_input("Aprovador") if status == "Autorizado" else ""
 
             if status == "Bloqueado":
