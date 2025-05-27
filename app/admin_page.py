@@ -51,8 +51,8 @@ def admin_page():
         # Status do sistema
         st.subheader("Status do Sistema")
         st.json({
-            "sistema": "Controle de Acesso de Veículos",
-            "versão": "1.0.0",
+            "sistema": "Controle de Acesso de Pessoas e Veículos",
+            "versão": "1.0.9",
             "modo_login": "OIDC (OpenID Connect)",
             "status": "Ativo",
             "Developer": "Cristian Ferreira Carlos",
