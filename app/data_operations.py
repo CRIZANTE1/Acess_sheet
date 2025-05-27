@@ -15,7 +15,7 @@ def show_progress_bar(progress_placeholder):
 def initialize_columns(df):
     """Certifica-se de que todas as colunas necessárias estão presentes no DataFrame"""
     required_columns = [
-        "Nome", "RG/CPF", "Placa", "Marca do Carro", "Horário de Entrada", 
+        "Nome", "RG", "Placa", "Marca do Carro", "Horário de Entrada", 
         "Data", "Empresa", "Status da Entrada", "Motivo do Bloqueio", "Aprovador", "Data do Primeiro Registro"
     ]
     for column in required_columns:
@@ -76,7 +76,7 @@ def add_record(name, rg, placa, marca_carro, horario_entrada, data, empresa, sta
         df = pd.DataFrame(data_from_sheet[1:], columns=columns)
     else:
         df = pd.DataFrame(columns=[
-            "ID", "Nome", "RG/CPF", "Placa", "Marca do Carro", "Horário de Entrada", 
+            "ID", "Nome", "RG", "Placa", "Marca do Carro", "Horário de Entrada", 
             "Data", "Empresa", "Status da Entrada", "Motivo do Bloqueio", "Aprovador", "Data do Primeiro Registro", "Horário de Saída"
         ])
     
@@ -311,7 +311,7 @@ def mouth_consult(): # Consulta por mês as entradas de uma pessoa especifica
                     # Set the locale to pt_BR
                     locale.setlocale(locale.LC_TIME, 'pt_BR.utf8')
                     st.write(f"Registros de {name_to_check_month} para o mês de {month_to_check.strftime('%B %Y')}:")
-                    st.dataframe(filtered_df.drop(columns=["RG/CPF"], errors='ignore'))
+                    st.dataframe(filtered_df)
                 else:
                     st.warning(f"Nenhum registro encontrado para {name_to_check_month} no mês de {month_to_check.strftime('%B %Y')}.")
             else:
