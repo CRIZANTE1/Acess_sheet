@@ -65,7 +65,7 @@ Este sistema gerencia o controle de acesso de visitantes e veículos, utilizando
 - Controle de acesso de visitantes e veículos usando Google Sheets
 - Autenticação de usuário via Google OIDC
 - Verificação automática de briefing
-- Interface administrativa (restrita a usuários com papel de 'admin' na aba 'users' do Google Sheets)
+
 
 ## Estrutura de Arquivos
 
