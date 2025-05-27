@@ -46,8 +46,23 @@ class SheetOperations:
             aba = archive.worksheet_by_title(aba_name)
             data = aba.get_all_values()
             
-            logging.info(f"Dados da aba '{aba_name}' lidos com sucesso.")
-            return data
+            if not data:
+                logging.warning(f"A aba '{aba_name}' está vazia.")
+                return []
+
+            # Identificar colunas com nomes não vazios na primeira linha (cabeçalhos)
+            header = data[0]
+            valid_columns_indices = [i for i, col_name in enumerate(header) if col_name.strip()]
+            
+            if not valid_columns_indices:
+                logging.warning(f"Nenhum cabeçalho válido encontrado na aba '{aba_name}'.")
+                return []
+
+            # Filtrar os dados para incluir apenas as colunas válidas
+            filtered_data = [[row[i] for i in valid_columns_indices] for row in data]
+            
+            logging.info(f"Dados da aba '{aba_name}' lidos e filtrados com sucesso.")
+            return filtered_data
         
         except Exception as e:
             logging.error(f"Erro ao ler dados da aba '{aba_name}': {e}")
@@ -131,3 +146,4 @@ class SheetOperations:
         except Exception as e:
             logging.error(f"Erro ao excluir dados: {e}", exc_info=True)
             return False
+
