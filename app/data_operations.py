@@ -243,7 +243,7 @@ def check_blocked_records(df):
     Verifica se há registros Bloqueadas e aplica a lógica de liberação recente.
     """
     # Filtra os registros Bloqueadas
-    blocked_records = df[df['Status da Entrada'] == 'Bloqueado']
+    blocked_records = df[df['Status da Entrada'] == 'Bloqueada']
 
     # Obtém a data mais recente de liberação para cada nome
     recent_release_dates = df[df['Status da Entrada'] == 'Autorizada'].groupby('Nome')['Data'].max()
@@ -264,8 +264,9 @@ def check_blocked_records(df):
         for _, row in blocked_records.iterrows()
         if should_show_block(row)
     ])
-    
+
     return blocked_info if blocked_info else None
+
 
 def get_block_info(df, name):
     """
@@ -308,11 +309,15 @@ def mouth_consult(): # Consulta por mês as entradas de uma pessoa especifica
                 filtered_df = st.session_state.df_acesso_veiculos[mask]
                 
                 if not filtered_df.empty:
-                    # Set the locale to pt_BR
-                    locale.setlocale(locale.LC_TIME, 'pt_BR.utf8')
+                    # Set the locale for time formatting
+                    try:
+                        locale.setlocale(locale.LC_TIME, '') # Use default system locale
+                    except locale.Error:
+                        st.warning("Could not set locale for time formatting. Using default.")
                     st.write(f"Registros de {name_to_check_month} para o mês de {month_to_check.strftime('%B %Y')}:")
                     st.dataframe(filtered_df)
                 else:
                     st.warning(f"Nenhum registro encontrado para {name_to_check_month} no mês de {month_to_check.strftime('%B %Y')}.")
             else:
                 st.warning("Por favor, selecione o nome e o mês para consulta.")
+
