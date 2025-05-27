@@ -265,6 +265,8 @@ def check_blocked_records(df):
         if should_show_block(row)
     ])
 
+    if blocked_info:
+        st.warning("Registros Bloqueados:\n" + blocked_info)
     return blocked_info if blocked_info else None
 
 
