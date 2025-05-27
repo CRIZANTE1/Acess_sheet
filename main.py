@@ -3,6 +3,7 @@ import pandas as pd
 from app.ui_interface import vehicle_access_interface
 from app.data_operations import mouth_consult
 from app.admin_page import admin_page
+from app.summary_page import summary_page # Importar a nova página de resumo
 from auth.login_page import show_login_page, show_user_header, show_logout_button
 from auth.auth_utils import is_user_logged_in, get_user_display_name, is_admin
 from app.operations import SheetOperations
@@ -35,7 +36,9 @@ def main():
         page_options = ["Controle de Acesso"]
         if user_is_admin:
             page_options.append("Configurações do Sistema")
-        
+        else:
+            page_options.append("Resumo") # Adicionar opção de resumo para não administradores
+            
         page = st.sidebar.selectbox("Escolha a página:", page_options)
         
         if page == "Controle de Acesso":
@@ -46,6 +49,8 @@ def main():
                 admin_page()
             else:
                 st.error("Você não tem permissões para acessar esta página.")
+        elif page == "Resumo": # Adicionar a condição para a nova página de resumo
+            summary_page()
     else:
         show_login_page()
         
@@ -53,3 +58,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
