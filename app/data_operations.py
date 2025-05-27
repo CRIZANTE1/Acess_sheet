@@ -240,13 +240,13 @@ def check_entry(name, data):
 
 def check_blocked_records(df):
     """
-    Verifica se há registros bloqueados e aplica a lógica de liberação recente.
+    Verifica se há registros Bloqueadas e aplica a lógica de liberação recente.
     """
-    # Filtra os registros bloqueados
+    # Filtra os registros Bloqueadas
     blocked_records = df[df['Status da Entrada'] == 'Bloqueada']
 
     # Obtém a data mais recente de liberação para cada nome
-    recent_release_dates = df[df['Status da Entrada'] == 'Liberada'].groupby('Nome')['Data'].max()
+    recent_release_dates = df[df['Status da Entrada'] == 'Autorizada'].groupby('Nome')['Data'].max()
 
     def should_show_block(record):
         name = record['Nome']
