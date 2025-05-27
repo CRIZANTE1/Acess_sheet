@@ -33,8 +33,9 @@ def main():
 
         user_is_admin = is_admin()
         
-        page_options = ["Controle de Acesso"]
+        page_options = [] # Começar com uma lista vazia
         if user_is_admin:
+            page_options.append("Controle de Acesso") # Adicionar Controle de Acesso apenas para admin
             page_options.append("Configurações do Sistema")
         else:
             page_options.append("Resumo") # Adicionar opção de resumo para não administradores
