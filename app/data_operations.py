@@ -315,7 +315,7 @@ def mouth_consult(): # Consulta por mês as entradas de uma pessoa especifica
                     except locale.Error:
                         st.warning("Could not set locale for time formatting. Using default.")
                     st.write(f"Registros de {name_to_check_month} para o mês de {month_to_check.strftime('%B %Y')}:")
-                    st.dataframe(filtered_df)
+                    st.dataframe(filtered_df.drop(columns=["RG"], errors='ignore'))
                 else:
                     st.warning(f"Nenhum registro encontrado para {name_to_check_month} no mês de {month_to_check.strftime('%B %Y')}.")
             else:
