@@ -94,7 +94,7 @@ Este sistema gerencia o controle de acesso de visitantes e veículos, utilizando
 
 ## Suporte
 
-Para suporte técnico ou dúvidas, entre em contato com a equipe de TI.
+Para suporte técnico ou dúvidas, entre em contato com o desenvolvedor.
 
 ## Notas de Segurança
 
