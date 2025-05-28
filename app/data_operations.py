@@ -15,7 +15,7 @@ def show_progress_bar(progress_placeholder):
 def initialize_columns(df):
     """Certifica-se de que todas as colunas necessárias estão presentes no DataFrame"""
     required_columns = [
-        "Nome", "RG/CPF", "Placa", "Marca do Carro", "Horário de Entrada", 
+        "Nome", "CPF", "Placa", "Marca do Carro", "Horário de Entrada", 
         "Data", "Empresa", "Status da Entrada", "Motivo do Bloqueio", "Aprovador", "Data do Primeiro Registro"
     ]
     for column in required_columns:
@@ -65,7 +65,7 @@ def check_briefing_needed(df, name, current_date):
         st.error(f"Erro ao processar datas: {str(e)}")
         return False, None
 
-def add_record(name, rg_cpf, placa, marca_carro, horario_entrada, data, empresa, status, motivo=None, aprovador=None):
+def add_record(name, cpf, placa, marca_carro, horario_entrada, data, empresa, status, motivo=None, aprovador=None):
     sheet_operations = SheetOperations()
     
     # Carregar dados existentes para verificar e adicionar
@@ -74,9 +74,14 @@ def add_record(name, rg_cpf, placa, marca_carro, horario_entrada, data, empresa,
         # A primeira linha são os cabeçalhos
         columns = data_from_sheet[0]
         df = pd.DataFrame(data_from_sheet[1:], columns=columns)
+        # Renomear colunas antigas para CPF
+        if 'RG' in df.columns:
+            df.rename(columns={'RG': 'CPF'}, inplace=True)
+        if 'RG/CPF' in df.columns:
+            df.rename(columns={'RG/CPF': 'CPF'}, inplace=True)
     else:
         df = pd.DataFrame(columns=[
-            "Nome", "RG/CPF", "Placa", "Marca do Carro", "Horário de Entrada", 
+            "Nome", "CPF", "Placa", "Marca do Carro", "Horário de Entrada", 
             "Horário de Saída", "Data", "Empresa", "Status da Entrada", "Motivo do Bloqueio", "Aprovador", "Data do Primeiro Registro"
         ])
     
@@ -120,7 +125,7 @@ def add_record(name, rg_cpf, placa, marca_carro, horario_entrada, data, empresa,
         # Atualiza o registro existente
         record_id = existing_record["ID"].iloc[0]
         updated_data = [
-            name, rg_cpf, placa, marca_carro, horario_entrada, 
+            name, cpf, placa, marca_carro, horario_entrada, 
             existing_record.get("Horário de Saída", ""), data_formatada, empresa, 
             status, motivo if motivo else "", aprovador if aprovador else "", 
             existing_record["Data do Primeiro Registro"]
@@ -146,7 +151,7 @@ def add_record(name, rg_cpf, placa, marca_carro, horario_entrada, data, empresa,
                     first_registration_date = data_formatada
 
         new_record_list = [
-            name, rg_cpf, placa, marca_carro, horario_entrada, "", # Horário de Saída vazio para novo registro
+            name, cpf, placa, marca_carro, horario_entrada, "", # Horário de Saída vazio para novo registro
             data_formatada, empresa,
             status, motivo if motivo else "", aprovador if aprovador else "",
             first_registration_date
@@ -163,6 +168,11 @@ def update_exit_time(name, date, new_exit_time):
 
     columns = data_from_sheet[0]
     df = pd.DataFrame(data_from_sheet[1:], columns=columns)
+    # Renomear colunas antigas para CPF
+    if 'RG' in df.columns:
+        df.rename(columns={'RG': 'CPF'}, inplace=True)
+    if 'RG/CPF' in df.columns:
+        df.rename(columns={'RG/CPF': 'CPF'}, inplace=True)
 
     # Encontrar o registro
     record_to_update = df[(df["Nome"] == name) & (df["Data"] == date)]
@@ -174,10 +184,10 @@ def update_exit_time(name, date, new_exit_time):
         updated_row_df["Horário de Saída"] = new_exit_time
         
         # Garantir que a lista de dados corresponda à estrutura da planilha
-        # A ordem das colunas na planilha é: Nome, RG/CPF, Placa, Marca do Carro, Horário de Entrada, Horário de Saída, Data, Empresa, Status da Entrada, Motivo do Bloqueio, Aprovador, Data do Primeiro Registro
+        # A ordem das colunas na planilha é: Nome, CPF, Placa, Marca do Carro, Horário de Entrada, Horário de Saída, Data, Empresa, Status da Entrada, Motivo do Bloqueio, Aprovador, Data do Primeiro Registro
         updated_data_list = [
             updated_row_df["Nome"].iloc[0],
-            updated_row_df["RG/CPF"].iloc[0],
+            updated_row_df["CPF"].iloc[0],
             updated_row_df["Placa"].iloc[0],
             updated_row_df["Marca do Carro"].iloc[0],
             updated_row_df["Horário de Entrada"].iloc[0],
@@ -329,11 +339,14 @@ def mouth_consult(): # Consulta por mês as entradas de uma pessoa especifica
                     except locale.Error:
                         st.warning("Could not set locale for time formatting. Using default.")
                     st.write(f"Registros de {name_to_check_month} para o mês de {month_to_check.strftime('%B %Y')}:")
-                    st.dataframe(filtered_df.drop(columns=["RG/CPF"], errors='ignore'))
+                    st.dataframe(filtered_df.drop(columns=["CPF"], errors='ignore'))
                 else:
                     st.warning(f"Nenhum registro encontrado para {name_to_check_month} no mês de {month_to_check.strftime('%B %Y')}.")
             else:
                 st.warning("Por favor, selecione o nome e o mês para consulta.")
+
+
+
 
 
 
