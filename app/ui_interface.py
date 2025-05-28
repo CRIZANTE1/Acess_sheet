@@ -60,22 +60,12 @@ def vehicle_access_interface():
     sheet_operations = SheetOperations()
     data_from_sheet = sheet_operations.carregar_dados()
     if data_from_sheet:
-        # Debug dos dados carregados
-        st.write("Debug - Headers da planilha:", data_from_sheet[0])
-        st.write("Debug - Primeira linha de dados:", data_from_sheet[1] if len(data_from_sheet) > 1 else "Sem dados")
-        
         # Use the actual headers from the sheet
         columns = data_from_sheet[0]
         df_temp = pd.DataFrame(data_from_sheet[1:], columns=columns)
-        
-        # Debug do DataFrame
-        st.write("Debug - Colunas do DataFrame:", df_temp.columns.tolist())
-        st.write("Debug - Primeiros registros:", df_temp.head().to_dict())
-        
         # Rename 'RG' to 'RG/CPF' if 'RG' exists and handle empty values
         if 'RG' in df_temp.columns and 'RG/CPF' not in df_temp.columns:
             df_temp.rename(columns={'RG': 'RG/CPF'}, inplace=True)
-            st.write("Debug - Coluna RG renomeada para RG/CPF")
         
         # Garantir que valores nulos ou vazios sejam tratados corretamente
         df_temp = df_temp.fillna("")
@@ -344,6 +334,8 @@ def blocks():
         st.error("Registros Bloqueados:\n" + blocked_info)
     else:
         st.empty()
+
+
 
 
 
