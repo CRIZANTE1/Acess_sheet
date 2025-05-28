@@ -64,7 +64,7 @@ def vehicle_access_interface():
         st.session_state.df_acesso_veiculos = pd.DataFrame(data_from_sheet[1:], columns=columns)
     else:
         st.session_state.df_acesso_veiculos = pd.DataFrame(columns=[
-            "ID", "Nome", "RG", "Placa", "Marca do Carro", "Horário de Entrada", 
+            "ID", "Nome", "CPF", "Placa", "Marca do Carro", "Horário de Entrada", 
             "Data", "Empresa", "Status da Entrada", "Motivo do Bloqueio", "Aprovador", "Data do Primeiro Registro", "Horário de Saída"
         ])
 
@@ -79,7 +79,7 @@ def vehicle_access_interface():
         if name_to_add_or_edit == "Novo Registro":
             # Campos para adicionar novo registro
             name = st.text_input("Nome:")
-            rg = st.text_input("RG/CPG:")
+            CPF = st.text_input("CPF/CPG:")
             placa = st.text_input("Placa do Carro (opcional):")
             marca_carro = st.text_input("Marca do Carro (opcional):")
             data = st.date_input("Data:")
@@ -93,12 +93,12 @@ def vehicle_access_interface():
                 st.warning("A liberação só pode ser feita pelo responsável pela segurança ou gerente.")
 
             if st.button("Adicionar Registro"):
-                if name and rg and horario_entrada and data and empresa:
+                if name and CPF and horario_entrada and data and empresa:
                     data_obj = datetime.strptime(data.strftime("%Y-%m-%d"), "%Y-%m-%d")
                     data_formatada = data_obj.strftime("%d/%m/%Y")
 
                     success = add_record(
-                        name, rg, placa, marca_carro, 
+                        name, CPF, placa, marca_carro, 
                         horario_entrada, 
                         data_formatada,
                         empresa, 
@@ -114,12 +114,12 @@ def vehicle_access_interface():
                     else:
                         st.error("Falha ao adicionar registro.")
                 else:
-                    st.warning("Por favor, preencha todos os campos obrigatórios: Nome, RG/CPF, Horário de Entrada, Data e Empresa.")
+                    st.warning("Por favor, preencha todos os campos obrigatórios: Nome, CPF, Horário de Entrada, Data e Empresa.")
         else:
             # Campos para editar registro existente
             existing_record = st.session_state.df_acesso_veiculos[st.session_state.df_acesso_veiculos["Nome"] == name_to_add_or_edit].iloc[0]
             
-            rg = st.text_input("RG:", value=existing_record["RG/CPF"])
+            CPF = st.text_input("CPF:", value=existing_record["CPF"])
             placa = st.text_input("Placa do Carro (opcional):", value=existing_record["Placa"])
             marca_carro = st.text_input("Marca do Carro (opcional):", value=existing_record["Marca do Carro"])
             data = st.date_input("Data:", value=datetime.strptime(existing_record["Data"], "%d/%m/%Y"))
@@ -148,13 +148,13 @@ def vehicle_access_interface():
                 st.warning("A liberação só pode ser feita pelo responsável por profissional dá área responsável ou Gestor da UO.")
 
             if st.button("Atualizar Registro"):
-                if rg and horario_entrada and data and empresa:
+                if CPF and horario_entrada and data and empresa:
                     data_obj = datetime.strptime(data.strftime("%Y-%m-%d"), "%Y-%m-%d")
                     data_formatada = data_obj.strftime("%d/%m/%Y")
 
                     success = add_record( # add_record agora também lida com a edição
                         name_to_add_or_edit, 
-                        rg, 
+                        CPF, 
                         placa, 
                         marca_carro, 
                         horario_entrada, 
@@ -172,7 +172,7 @@ def vehicle_access_interface():
                     else:
                         st.error("Falha ao atualizar registro.")
                 else:
-                    st.warning("Por favor, preencha todos os campos obrigatórios: RG, Horário de Entrada, Data e Empresa.")
+                    st.warning("Por favor, preencha todos os campos obrigatórios: CPF, Horário de Entrada, Data e Empresa.")
                 
     # Atualizar horário de saída
     with st.expander("Atualizar Horário de Saída", expanded=False):
@@ -285,7 +285,7 @@ def blocks():
         df_current = pd.DataFrame(data_from_sheet[1:], columns=columns)
     else:
         df_current = pd.DataFrame(columns=[
-            "ID", "Nome", "RG", "Placa", "Marca do Carro", "Horário de Entrada", 
+            "ID", "Nome", "CPF", "Placa", "Marca do Carro", "Horário de Entrada", 
             "Data", "Empresa", "Status da Entrada", "Motivo do Bloqueio", "Aprovador", "Data do Primeiro Registro", "Horário de Saída"
         ])
 
