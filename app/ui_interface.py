@@ -16,6 +16,45 @@ def generate_time_options():
     
     return times
 
+def format_cpf(cpf):
+    """Formata o CPF no padrão XXX.XXX.XXX-XX"""
+    # Remove caracteres não numéricos
+    cpf = ''.join(filter(str.isdigit, str(cpf)))
+    if len(cpf) != 11:
+        return cpf
+    return f"{cpf[:3]}.{cpf[3:6]}.{cpf[6:9]}-{cpf[9:]}"
+
+def validate_cpf(cpf):
+    """Valida o CPF"""
+    # Remove caracteres não numéricos
+    cpf = ''.join(filter(str.isdigit, str(cpf)))
+    
+    # Verifica se tem 11 dígitos
+    if len(cpf) != 11:
+        return False
+    
+    # Verifica se todos os dígitos são iguais
+    if len(set(cpf)) == 1:
+        return False
+    
+    # Validação do primeiro dígito verificador
+    soma = sum(int(cpf[i]) * (10 - i) for i in range(9))
+    resto = (soma * 10) % 11
+    if resto == 10:
+        resto = 0
+    if resto != int(cpf[9]):
+        return False
+    
+    # Validação do segundo dígito verificador
+    soma = sum(int(cpf[i]) * (11 - i) for i in range(10))
+    resto = (soma * 10) % 11
+    if resto == 10:
+        resto = 0
+    if resto != int(cpf[10]):
+        return False
+    
+    return True
+
 def round_to_nearest_interval(time_value, interval=1):
     """Arredonda o horário para o intervalo mais próximo"""
     if pd.isna(time_value) or time_value == "":
@@ -63,16 +102,18 @@ def vehicle_access_interface():
         # Use the actual headers from the sheet
         columns = data_from_sheet[0]
         df_temp = pd.DataFrame(data_from_sheet[1:], columns=columns)
-        # Rename 'RG' to 'RG/CPF' if 'RG' exists and handle empty values
-        if 'RG' in df_temp.columns and 'RG/CPF' not in df_temp.columns:
-            df_temp.rename(columns={'RG': 'RG/CPF'}, inplace=True)
+        # Renomear 'RG' ou 'RG/CPF' para 'CPF'
+        if 'RG' in df_temp.columns:
+            df_temp.rename(columns={'RG': 'CPF'}, inplace=True)
+        if 'RG/CPF' in df_temp.columns:
+            df_temp.rename(columns={'RG/CPF': 'CPF'}, inplace=True)
         
         # Garantir que valores nulos ou vazios sejam tratados corretamente
         df_temp = df_temp.fillna("")
         st.session_state.df_acesso_veiculos = df_temp
     else:
         st.session_state.df_acesso_veiculos = pd.DataFrame(columns=[
-            "Nome", "RG/CPF", "Placa", "Marca do Carro", "Horário de Entrada",
+            "Nome", "CPF", "Placa", "Marca do Carro", "Horário de Entrada",
             "Horário de Saída", "Data", "Empresa", "Status da Entrada", "Motivo do Bloqueio", "Aprovador", "Data do Primeiro Registro"
         ])
 
@@ -87,7 +128,15 @@ def vehicle_access_interface():
         if name_to_add_or_edit == "Novo Registro":
             # Campos para adicionar novo registro
             name = st.text_input("Nome:")
-            rg = st.text_input("RG/CPF:")
+            cpf = st.text_input("CPF:")
+            
+            # Validação do CPF
+            if cpf:
+                if not validate_cpf(cpf):
+                    st.error("CPF inválido! Por favor, insira um CPF válido.")
+                else:
+                    cpf = format_cpf(cpf)
+            
             placa = st.text_input("Placa do Carro (opcional):")
             marca_carro = st.text_input("Marca do Carro (opcional):")
             data = st.date_input("Data:")
@@ -101,12 +150,12 @@ def vehicle_access_interface():
                 st.warning("A liberação só pode ser feita por profissional da área responsável ou Gestor da UO.")
 
             if st.button("Adicionar Registro"):
-                if name and rg and horario_entrada and data and empresa:
+                if name and cpf and validate_cpf(cpf) and horario_entrada and data and empresa:
                     data_obj = datetime.strptime(data.strftime("%Y-%m-%d"), "%Y-%m-%d")
                     data_formatada = data_obj.strftime("%d/%m/%Y")
 
                     success = add_record(
-                        name, rg, placa, marca_carro, 
+                        name, cpf, placa, marca_carro, 
                         horario_entrada, 
                         data_formatada,
                         empresa, 
@@ -122,30 +171,38 @@ def vehicle_access_interface():
                     else:
                         st.error("Falha ao adicionar registro.")
                 else:
-                    st.warning("Por favor, preencha todos os campos obrigatórios: Nome, RG, Horário de Entrada, Data e Empresa.")
+                    st.warning("Por favor, preencha todos os campos obrigatórios com dados válidos: Nome, CPF, Horário de Entrada, Data e Empresa.")
         else:
             # Campos para editar registro existente
             existing_record = st.session_state.df_acesso_veiculos[st.session_state.df_acesso_veiculos["Nome"] == name_to_add_or_edit].iloc[0]
             
-            # Tratamento especial para o campo RG/CPF para preservar números longos
-            rg_cpf_value = ""
-            if "RG/CPF" in existing_record:
-                rg_cpf_value = str(existing_record["RG/CPF"])
-            elif "RG" in existing_record:
-                rg_cpf_value = str(existing_record["RG"])
+            # Tratamento especial para o campo CPF para preservar números longos
+            cpf_value = ""
+            if "CPF" in existing_record:
+                cpf_value = str(existing_record["CPF"])
+            elif "RG/CPF" in existing_record:
+                cpf_value = str(existing_record["RG/CPF"])
                 
             # Garantir que o valor seja uma string e remover formatação científica
-            if pd.isna(rg_cpf_value) or rg_cpf_value is None or rg_cpf_value == "nan":
-                rg_cpf_value = ""
+            if pd.isna(cpf_value) or cpf_value is None or cpf_value == "nan":
+                cpf_value = ""
             else:
                 try:
-                    # Tenta converter para número e depois para string para remover notação científica
-                    rg_cpf_value = str(int(float(str(rg_cpf_value).replace(',', '').replace('.', ''))))
+                    # Remove formatação existente e aplica nova formatação
+                    cpf_value = ''.join(filter(str.isdigit, str(cpf_value)))
+                    if len(cpf_value) == 11:
+                        cpf_value = format_cpf(cpf_value)
                 except (ValueError, TypeError):
-                    # Se falhar, usa o valor original limpo
-                    rg_cpf_value = str(rg_cpf_value).strip()
+                    cpf_value = str(cpf_value).strip()
             
-            rg = st.text_input("RG/CPF:", value=rg_cpf_value)
+            cpf = st.text_input("CPF:", value=cpf_value)
+            
+            # Validação do CPF
+            if cpf:
+                if not validate_cpf(cpf):
+                    st.error("CPF inválido! Por favor, insira um CPF válido.")
+                else:
+                    cpf = format_cpf(cpf)
             
             placa = st.text_input("Placa do Carro (opcional):", value=existing_record["Placa"])
             marca_carro = st.text_input("Marca do Carro (opcional):", value=existing_record["Marca do Carro"])
@@ -185,13 +242,13 @@ def vehicle_access_interface():
                 st.warning("A liberação só pode ser feita por profissional da área responsável ou Gestor da UO.")
 
             if st.button("Atualizar Registro"):
-                if rg and horario_entrada and data and empresa:
+                if cpf and validate_cpf(cpf) and horario_entrada and data and empresa:
                     data_obj = datetime.strptime(data.strftime("%Y-%m-%d"), "%Y-%m-%d")
                     data_formatada = data_obj.strftime("%d/%m/%Y")
 
-                    success = add_record( # add_record agora também lida com a edição
+                    success = add_record(
                         name_to_add_or_edit, 
-                        rg, 
+                        cpf, 
                         placa, 
                         marca_carro, 
                         horario_entrada, 
@@ -209,7 +266,7 @@ def vehicle_access_interface():
                     else:
                         st.error("Falha ao atualizar registro.")
                 else:
-                    st.warning("Por favor, preencha todos os campos obrigatórios: RG, Horário de Entrada, Data e Empresa.")
+                    st.warning("Por favor, preencha todos os campos obrigatórios com dados válidos: CPF, Horário de Entrada, Data e Empresa.")
                 
     # Atualizar horário de saída
     with st.expander("Atualizar Horário de Saída", expanded=False):
@@ -271,6 +328,7 @@ def vehicle_access_interface():
                 person, status = check_entry(name_to_check, None)
                 if person is not None:
                     st.write(f"Nome: {person['Nome']}")
+                    st.write(f"CPF: {person['CPF']}")
                     st.write(f"Placa: {person['Placa']}")
                     st.write(f"Marca do Carro: {person['Marca do Carro']}")
                     st.write(f"Horário de Entrada: {person['Horário de Entrada']}")
@@ -302,7 +360,7 @@ def vehicle_access_interface():
             if empresa_filter != "Todas":
                 df_filtered = df_filtered[df_filtered["Empresa"] == empresa_filter]
             
-            columns_to_display = ["Nome", "Placa", "Marca do Carro", "Empresa", "Status da Entrada", "Motivo do Bloqueio", "Aprovador"]
+            columns_to_display = ["Nome", "CPF", "Placa", "Marca do Carro", "Empresa", "Status da Entrada", "Motivo do Bloqueio", "Aprovador"]
             df_filtered = df_filtered[columns_to_display]
             
             if not df_filtered.empty:
@@ -320,11 +378,13 @@ def blocks():
     if data_from_sheet:
         columns = data_from_sheet[0]
         df_current = pd.DataFrame(data_from_sheet[1:], columns=columns)
-        if 'RG' in df_current.columns and 'RG/CPF' not in df_current.columns:
-            df_current.rename(columns={'RG': 'RG/CPF'}, inplace=True)
+        if 'RG' in df_current.columns:
+            df_current.rename(columns={'RG': 'CPF'}, inplace=True)
+        if 'RG/CPF' in df_current.columns:
+            df_current.rename(columns={'RG/CPF': 'CPF'}, inplace=True)
     else:
         df_current = pd.DataFrame(columns=[
-            "Nome", "RG/CPF", "Placa", "Marca do Carro", "Horário de Entrada", 
+            "Nome", "CPF", "Placa", "Marca do Carro", "Horário de Entrada", 
             "Horário de Saída", "Data", "Empresa", "Status da Entrada", "Motivo do Bloqueio", "Aprovador", "Data do Primeiro Registro"
         ])
 
@@ -334,6 +394,10 @@ def blocks():
         st.error("Registros Bloqueados:\n" + blocked_info)
     else:
         st.empty()
+
+
+
+
 
 
 
