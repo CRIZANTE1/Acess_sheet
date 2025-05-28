@@ -307,17 +307,25 @@ def vehicle_access_interface():
                 st.write("Registros em aberto para esta pessoa:")
                 for _, record in person_records.iterrows():
                     st.info(f"""
-                    Data: {record['Data']}
+                    Data de Entrada: {record['Data']}
                     Horário de Entrada: {record['Horário de Entrada']}
                     Empresa: {record['Empresa']}
+                    Placa: {record['Placa'] if record['Placa'] else 'Não informada'}
                     """)
+                
+                st.info("""
+                **Como registrar a saída:**
+                1. Se a pessoa saiu no mesmo dia da entrada, selecione a mesma data da entrada
+                2. Se a pessoa saiu em um dia diferente (ex: entrou ontem e saiu hoje), selecione a data atual da saída
+                3. O sistema encontrará automaticamente o registro de entrada correspondente mais recente
+                """)
             else:
                 st.warning("Não há registros em aberto para esta pessoa.")
 
-        data_to_update = st.date_input("Data aproximada para atualizar horário de saída:", key="data_saida")
+        data_to_update = st.date_input("Data da Saída:", key="data_saida", value=datetime.now())
         horario_saida_options = generate_time_options()
         default_horario_saida = round_to_nearest_interval(datetime.now().strftime("%H:%M"))
-        horario_saida = st.selectbox("Novo Horário de Saída (HH:MM):", options=horario_saida_options, index=horario_saida_options.index(default_horario_saida), key="horario_saida")
+        horario_saida = st.selectbox("Horário de Saída:", options=horario_saida_options, index=horario_saida_options.index(default_horario_saida), key="horario_saida")
 
         if st.button("Atualizar Horário de Saída"):
             if name_to_update and data_to_update and horario_saida:
@@ -432,6 +440,8 @@ def blocks():
         st.error("Registros Bloqueados:\n" + blocked_info)
     else:
         st.empty()
+
+
 
 
 
