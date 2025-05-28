@@ -15,7 +15,7 @@ def show_progress_bar(progress_placeholder):
 def initialize_columns(df):
     """Certifica-se de que todas as colunas necessárias estão presentes no DataFrame"""
     required_columns = [
-        "Nome", "CPF", "Placa", "Marca do Carro", "Horário de Entrada", 
+        "Nome", "RG", "Placa", "Marca do Carro", "Horário de Entrada", 
         "Data", "Empresa", "Status da Entrada", "Motivo do Bloqueio", "Aprovador", "Data do Primeiro Registro"
     ]
     for column in required_columns:
@@ -27,7 +27,7 @@ def check_briefing_needed(df, name, current_date):
     """
     Verifica se um visitante precisa fazer o briefing baseado em seu histórico completo.
     
-    ACPFs:
+    Args:
         df (pd.DataFrame): DataFrame com todos os registros
         name (str): Nome do visitante
         current_date (str): Data atual no formato dd/mm/yyyy
@@ -65,7 +65,7 @@ def check_briefing_needed(df, name, current_date):
         st.error(f"Erro ao processar datas: {str(e)}")
         return False, None
 
-def add_record(name, CPF, placa, marca_carro, horario_entrada, horario_saida, data, empresa, status, motivo=None, aprovador=None):
+def add_record(name, rg, placa, marca_carro, horario_entrada, data, empresa, status, motivo=None, aprovador=None):
     sheet_operations = SheetOperations()
     
     # Carregar dados existentes para verificar e adicionar
@@ -76,8 +76,8 @@ def add_record(name, CPF, placa, marca_carro, horario_entrada, horario_saida, da
         df = pd.DataFrame(data_from_sheet[1:], columns=columns)
     else:
         df = pd.DataFrame(columns=[
-            "ID", "Nome", "CPF", "Placa", "Marca do Carro", "Horário de Entrada", "Horário de Saída", 
-            "Data", "Empresa", "Status da Entrada", "Motivo do Bloqueio", "Aprovador", "Data do Primeiro Registro"
+            "ID", "Nome", "RG", "Placa", "Marca do Carro", "Horário de Entrada", 
+            "Data", "Empresa", "Status da Entrada", "Motivo do Bloqueio", "Aprovador", "Data do Primeiro Registro", "Horário de Saída"
         ])
     
     df = initialize_columns(df)  # Certifique-se de que todas as colunas necessárias estão presentes
@@ -120,19 +120,9 @@ def add_record(name, CPF, placa, marca_carro, horario_entrada, horario_saida, da
         # Atualiza o registro existente
         record_id = existing_record["ID"].iloc[0]
         updated_data = [
-            id(record_id),  # ID do registro existente
-            name,
-            CPF,
-            placa,
-            marca_carro,
-            horario_entrada,
-            existing_record.get("Horário de Saída", "").iloc[0], # Horário de Saída na posição correta
-            data_formatada,
-            empresa,
-            status,
-            motivo if motivo else "",
-            aprovador if aprovador else "",
-            existing_record["Data do Primeiro Registro"].iloc[0] if "Data do Primeiro Registro" in existing_record.columns else ""
+            name, rg, placa, marca_carro, horario_entrada, data_formatada, empresa, 
+            status, motivo if motivo else "", aprovador if aprovador else "", 
+            existing_record["Data do Primeiro Registro"].iloc[0], existing_record.get("Horário de Saída", "").iloc[0]
         ]
         sheet_operations.editar_dados(record_id, updated_data)
         return True
@@ -154,19 +144,9 @@ def add_record(name, CPF, placa, marca_carro, horario_entrada, horario_saida, da
                     first_registration_date = data_formatada
 
         new_record_list = [
-            "", # Placeholder para ID
-            name,
-            CPF,
-            placa,
-            marca_carro,
-            horario_entrada,
-            "", # Horário de Saída vazio para novo registro
-            data_formatada,
-            empresa,
-            status,
-            motivo if motivo else "",
-            aprovador if aprovador else "",
-            first_registration_date
+            name, rg, placa, marca_carro, horario_entrada, data_formatada, empresa, 
+            status, motivo if motivo else "", aprovador if aprovador else "", 
+            first_registration_date, "" # Horário de Saída vazio para novo registro
         ]
         sheet_operations.adc_dados(new_record_list)
         return True
@@ -192,21 +172,9 @@ def update_exit_time(name, date, new_exit_time):
         updated_row_df = record_to_update.copy()
         updated_row_df["Horário de Saída"] = new_exit_time
         
-        # Construir a lista de dados atualizados na ordem correta das colunas (sem ID)
-        updated_data_list = [
-            updated_row_df["Nome"].iloc[0],
-            updated_row_df["CPF"].iloc[0],
-            updated_row_df["Placa"].iloc[0],
-            updated_row_df["Marca do Carro"].iloc[0],
-            updated_row_df["Horário de Entrada"].iloc[0],
-            updated_row_df["Horário de Saída"].iloc[0], # Horário de Saída na posição correta
-            updated_row_df["Data"].iloc[0],
-            updated_row_df["Empresa"].iloc[0],
-            updated_row_df["Status da Entrada"].iloc[0],
-            updated_row_df["Motivo do Bloqueio"].iloc[0] if "Motivo do Bloqueio" in updated_row_df.columns else "",
-            updated_row_df["Aprovador"].iloc[0] if "Aprovador" in updated_row_df.columns else "",
-            updated_row_df["Data do Primeiro Registro"].iloc[0] if "Data do Primeiro Registro" in updated_row_df.columns else ""
-        ]
+        # Converter o DataFrame de volta para uma lista na ordem correta das colunas
+        # Excluir a coluna 'ID' antes de passar para editar_dados
+        updated_data_list = updated_row_df.drop(columns=["ID"]).iloc[0].tolist()
         
         success = sheet_operations.editar_dados(record_id, updated_data_list)
         if success:
@@ -304,7 +272,7 @@ def get_block_info(df, name):
     """
     Obtém o número de bloqueios e os motivos de bloqueio para uma pessoa específica.
 
-    ACPFs:
+    Args:
         df (pd.DataFrame): DataFrame contendo os dados dos registros.
         name (str): Nome da pessoa para consultar.
 
@@ -347,13 +315,8 @@ def mouth_consult(): # Consulta por mês as entradas de uma pessoa especifica
                     except locale.Error:
                         st.warning("Could not set locale for time formatting. Using default.")
                     st.write(f"Registros de {name_to_check_month} para o mês de {month_to_check.strftime('%B %Y')}:")
-                    
-                    st.dataframe(filtered_df.drop(columns=["CPF"], errors='ignore'))
+                    st.dataframe(filtered_df.drop(columns=["RG/CPF"], errors='ignore'))
                 else:
                     st.warning(f"Nenhum registro encontrado para {name_to_check_month} no mês de {month_to_check.strftime('%B %Y')}.")
             else:
                 st.warning("Por favor, selecione o nome e o mês para consulta.")
-
-            else:
-                st.warning("Por favor, selecione o nome e o mês para consulta.")
-
