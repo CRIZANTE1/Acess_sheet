@@ -214,39 +214,85 @@ def update_exit_time(name, date_saida, new_exit_time):
     if data_saida_dt < data_entrada_dt:
         return False, f"A data de saída ({date_saida}) não pode ser anterior à data de entrada ({closest_record['Data']})."
 
-    # Validar horários no caso de mesma data
-    if data_saida_dt == data_entrada_dt:
+    # Se a saída for no mesmo dia da entrada, atualiza normalmente
+    if data_saida_dt.date() == data_entrada_dt.date():
         horario_entrada = datetime.strptime(closest_record['Horário de Entrada'], "%H:%M")
         horario_saida = datetime.strptime(new_exit_time, "%H:%M")
         if horario_saida < horario_entrada:
             return False, "O horário de saída não pode ser anterior ao horário de entrada no mesmo dia."
+        
+        # Atualizar o horário de saída
+        record_id = closest_record['ID']
+        updated_data = [
+            closest_record['Nome'],
+            closest_record['CPF'],
+            closest_record['Placa'],
+            closest_record['Marca do Carro'],
+            closest_record['Horário de Entrada'],
+            new_exit_time,
+            closest_record['Data'],
+            closest_record['Empresa'],
+            closest_record['Status da Entrada'],
+            closest_record.get('Motivo do Bloqueio', ''),
+            closest_record.get('Aprovador', ''),
+            closest_record.get('Data do Primeiro Registro', closest_record['Data'])
+        ]
+        
+        success = sheet_operations.editar_dados(record_id, updated_data)
+    else:
+        # Se a saída for em dia diferente:
+        # 1. Fecha o registro original com saída às 23:59
+        record_id = closest_record['ID']
+        updated_data = [
+            closest_record['Nome'],
+            closest_record['CPF'],
+            closest_record['Placa'],
+            closest_record['Marca do Carro'],
+            closest_record['Horário de Entrada'],
+            "23:59",
+            closest_record['Data'],
+            closest_record['Empresa'],
+            closest_record['Status da Entrada'],
+            closest_record.get('Motivo do Bloqueio', ''),
+            closest_record.get('Aprovador', ''),
+            closest_record.get('Data do Primeiro Registro', closest_record['Data'])
+        ]
+        
+        success1 = sheet_operations.editar_dados(record_id, updated_data)
+        
+        # 2. Cria registros intermediários para os dias entre entrada e saída
+        current_date = data_entrada_dt + timedelta(days=1)
+        while current_date.date() <= data_saida_dt.date():
+            # Se for o último dia (dia da saída), usa o horário de saída informado
+            horario_saida = new_exit_time if current_date.date() == data_saida_dt.date() else "23:59"
+            
+            new_record = [
+                closest_record['Nome'],
+                closest_record['CPF'],
+                closest_record['Placa'],
+                closest_record['Marca do Carro'],
+                "00:00",
+                horario_saida,
+                current_date.strftime("%d/%m/%Y"),
+                closest_record['Empresa'],
+                closest_record['Status da Entrada'],
+                closest_record.get('Motivo do Bloqueio', ''),
+                closest_record.get('Aprovador', ''),
+                closest_record.get('Data do Primeiro Registro', closest_record['Data'])
+            ]
+            
+            sheet_operations.adc_dados(new_record)
+            current_date += timedelta(days=1)
+            
+        success = success1
 
-    # Atualizar o horário de saída
-    record_id = closest_record['ID']
-    updated_data = [
-        closest_record['Nome'],
-        closest_record['CPF'],
-        closest_record['Placa'],
-        closest_record['Marca do Carro'],
-        closest_record['Horário de Entrada'],
-        new_exit_time,
-        closest_record['Data'],
-        closest_record['Empresa'],
-        closest_record['Status da Entrada'],
-        closest_record.get('Motivo do Bloqueio', ''),
-        closest_record.get('Aprovador', ''),
-        closest_record.get('Data do Primeiro Registro', closest_record['Data'])
-    ]
-
-    success = sheet_operations.editar_dados(record_id, updated_data)
-    
     if success:
         # Forçar atualização dos dados no cache
         if "df_acesso_veiculos" in st.session_state:
             del st.session_state.df_acesso_veiculos
-        return True, f"Saída registrada com sucesso para entrada do dia {closest_record['Data']}."
+        return True, f"Registros de saída atualizados com sucesso para o período de {closest_record['Data']} até {date_saida}."
     else:
-        return False, "Erro ao atualizar o horário de saída."
+        return False, "Erro ao atualizar os registros de saída."
 
 
 def delete_record(name, data):
