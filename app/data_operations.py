@@ -65,7 +65,7 @@ def check_briefing_needed(df, name, current_date):
         st.error(f"Erro ao processar datas: {str(e)}")
         return False, None
 
-def add_record(name, CPF, placa, marca_carro, horario_entrada, data, empresa, status, motivo=None, aprovador=None):
+def add_record(name, CPF, placa, marca_carro, horario_entrada, horario_saida, data, empresa, status, motivo=None, aprovador=None):
     sheet_operations = SheetOperations()
     
     # Carregar dados existentes para verificar e adicionar
@@ -76,8 +76,8 @@ def add_record(name, CPF, placa, marca_carro, horario_entrada, data, empresa, st
         df = pd.DataFrame(data_from_sheet[1:], columns=columns)
     else:
         df = pd.DataFrame(columns=[
-            "ID", "Nome", "CPF", "Placa", "Marca do Carro", "Horário de Entrada", 
-            "Data", "Empresa", "Status da Entrada", "Motivo do Bloqueio", "Aprovador", "Data do Primeiro Registro", "Horário de Saída"
+            "ID", "Nome", "CPF", "Placa", "Marca do Carro", "Horário de Entrada", "Horário de Saída", 
+            "Data", "Empresa", "Status da Entrada", "Motivo do Bloqueio", "Aprovador", "Data do Primeiro Registro"
         ])
     
     df = initialize_columns(df)  # Certifique-se de que todas as colunas necessárias estão presentes
@@ -172,9 +172,21 @@ def update_exit_time(name, date, new_exit_time):
         updated_row_df = record_to_update.copy()
         updated_row_df["Horário de Saída"] = new_exit_time
         
-        # Converter o DataFrame de volta para uma lista na ordem correta das colunas
-        # Excluir a coluna 'ID' antes de passar para editar_dados
-        updated_data_list = updated_row_df.drop(columns=["ID"]).iloc[0].tolist()
+        # Construir a lista de dados atualizados na ordem correta das colunas (sem ID)
+        updated_data_list = [
+            updated_row_df["Nome"].iloc[0],
+            updated_row_df["CPF"].iloc[0],
+            updated_row_df["Placa"].iloc[0],
+            updated_row_df["Marca do Carro"].iloc[0],
+            updated_row_df["Horário de Entrada"].iloc[0],
+            updated_row_df["Horário de Saída"].iloc[0], # Horário de Saída na posição correta
+            updated_row_df["Data"].iloc[0],
+            updated_row_df["Empresa"].iloc[0],
+            updated_row_df["Status da Entrada"].iloc[0],
+            updated_row_df["Motivo do Bloqueio"].iloc[0] if "Motivo do Bloqueio" in updated_row_df.columns else "",
+            updated_row_df["Aprovador"].iloc[0] if "Aprovador" in updated_row_df.columns else "",
+            updated_row_df["Data do Primeiro Registro"].iloc[0] if "Data do Primeiro Registro" in updated_row_df.columns else ""
+        ]
         
         success = sheet_operations.editar_dados(record_id, updated_data_list)
         if success:
@@ -320,4 +332,3 @@ def mouth_consult(): # Consulta por mês as entradas de uma pessoa especifica
                     st.warning(f"Nenhum registro encontrado para {name_to_check_month} no mês de {month_to_check.strftime('%B %Y')}.")
             else:
                 st.warning("Por favor, selecione o nome e o mês para consulta.")
-
