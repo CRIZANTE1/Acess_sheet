@@ -265,7 +265,27 @@ def vehicle_access_interface():
     with st.expander("Atualizar Horário de Saída", expanded=False):
         unique_names = st.session_state.df_acesso_veiculos["Nome"].unique()
         name_to_update = st.selectbox("Nome do registro para atualizar horário de saída:", options=unique_names)
-        data_to_update = st.date_input("Data do registro para atualizar horário de saída:", key="data_saida")
+
+        if name_to_update:
+            # Mostrar registros em aberto para a pessoa selecionada
+            person_records = st.session_state.df_acesso_veiculos[
+                (st.session_state.df_acesso_veiculos["Nome"] == name_to_update) &
+                ((st.session_state.df_acesso_veiculos["Horário de Saída"].isna()) | 
+                 (st.session_state.df_acesso_veiculos["Horário de Saída"] == ""))
+            ]
+
+            if not person_records.empty:
+                st.write("Registros em aberto para esta pessoa:")
+                for _, record in person_records.iterrows():
+                    st.info(f"""
+                    Data: {record['Data']}
+                    Horário de Entrada: {record['Horário de Entrada']}
+                    Empresa: {record['Empresa']}
+                    """)
+            else:
+                st.warning("Não há registros em aberto para esta pessoa.")
+
+        data_to_update = st.date_input("Data aproximada para atualizar horário de saída:", key="data_saida")
         horario_saida_options = generate_time_options()
         default_horario_saida = round_to_nearest_interval(datetime.now().strftime("%H:%M"))
         horario_saida = st.selectbox("Novo Horário de Saída (HH:MM):", options=horario_saida_options, index=horario_saida_options.index(default_horario_saida), key="horario_saida")
