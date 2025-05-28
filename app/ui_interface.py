@@ -315,9 +315,13 @@ def vehicle_access_interface():
                 
                 st.info("""
                 **Como registrar a saída:**
-                1. Se a pessoa saiu no mesmo dia da entrada, selecione a mesma data da entrada
-                2. Se a pessoa saiu em um dia diferente (ex: entrou ontem e saiu hoje), selecione a data atual da saída
-                3. O sistema encontrará automaticamente o registro de entrada correspondente mais recente
+                1. Se a pessoa saiu no mesmo dia da entrada, selecione a mesma data e o horário de saída
+                2. Se a pessoa saiu em um dia diferente (ex: entrou ontem e saiu hoje):
+                   - Selecione a data atual da saída
+                   - O sistema irá:
+                     * Fechar o registro do dia anterior às 23:59
+                     * Criar novos registros para os dias intermediários (00:00 às 23:59)
+                     * Registrar a saída final no último dia com o horário informado
                 """)
             else:
                 st.warning("Não há registros em aberto para esta pessoa.")
@@ -327,23 +331,25 @@ def vehicle_access_interface():
         default_horario_saida = round_to_nearest_interval(datetime.now().strftime("%H:%M"))
         horario_saida = st.selectbox("Horário de Saída:", options=horario_saida_options, index=horario_saida_options.index(default_horario_saida), key="horario_saida")
 
-        if st.button("Atualizar Horário de Saída"):
-            if name_to_update and data_to_update and horario_saida:
-                data_to_update = datetime.strptime(data_to_update.strftime("%Y-%m-%d"), "%Y-%m-%d")
-                success, message = update_exit_time(
-                    name_to_update, 
-                    data_to_update.strftime("%d/%m/%Y"), 
-                    horario_saida
-                )
-                if success:
-                    st.success(message)
-                    # Recarregar dados após a atualização
-                    st.session_state.df_acesso_veiculos = pd.DataFrame(sheet_operations.carregar_dados()[1:], columns=sheet_operations.carregar_dados()[0])
-                    st.rerun()
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("Atualizar Horário de Saída"):
+                if name_to_update and data_to_update and horario_saida:
+                    data_to_update = datetime.strptime(data_to_update.strftime("%Y-%m-%d"), "%Y-%m-%d")
+                    success, message = update_exit_time(
+                        name_to_update, 
+                        data_to_update.strftime("%d/%m/%Y"), 
+                        horario_saida
+                    )
+                    if success:
+                        st.success(message)
+                        # Recarregar dados após a atualização
+                        st.session_state.df_acesso_veiculos = pd.DataFrame(sheet_operations.carregar_dados()[1:], columns=sheet_operations.carregar_dados()[0])
+                        st.rerun()
+                    else:
+                        st.error(message)
                 else:
-                    st.error(message)
-            else:
-                st.warning("Por favor, selecione o nome, a data e o novo horário de saída.")
+                    st.warning("Por favor, selecione o nome, a data e o novo horário de saída.")
                 
     # Deletar registro
     with st.expander("Deletar Registro", expanded=False):
@@ -440,7 +446,6 @@ def blocks():
         st.error("Registros Bloqueados:\n" + blocked_info)
     else:
         st.empty()
-
 
 
 
