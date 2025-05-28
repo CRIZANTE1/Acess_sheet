@@ -146,7 +146,7 @@ def vehicle_access_interface():
             )
             empresa = st.text_input("Empresa:", value=existing_record["Empresa"])
 
-            status_options = ["Autorizado", "Bloqueada"]
+            status_options = ["Autorizado", "Bloqueado"]
             status_value = existing_record["Status da Entrada"]
             if pd.isna(status_value) or status_value not in status_options:
                 status_value = status_options[0]
