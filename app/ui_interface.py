@@ -59,15 +59,19 @@ def vehicle_access_interface():
     # Recarregar os dados do Google Sheets para garantir que estão atualizados
     sheet_operations = SheetOperations()
     data_from_sheet = sheet_operations.carregar_dados()
-    column_names = [
-        "ID", "Nome", "RG/CPF", "Placa", "Marca do Carro", "Horário de Entrada",
-        "Data", "Empresa", "Status da Entrada", "Motivo do Bloqueio", "Aprovador", "Data do Primeiro Registro", "Horário de Saída"
-    ]
     if data_from_sheet:
-        # Assuming the first row of data_from_sheet is headers, skip it and use predefined columns
-        st.session_state.df_acesso_veiculos = pd.DataFrame(data_from_sheet[1:], columns=column_names)
+        # Use the actual headers from the sheet
+        columns = data_from_sheet[0]
+        df_temp = pd.DataFrame(data_from_sheet[1:], columns=columns)
+        # Rename 'RG' to 'RG/CPF' if 'RG' exists
+        if 'RG' in df_temp.columns and 'RG/CPF' not in df_temp.columns:
+            df_temp.rename(columns={'RG': 'RG/CPF'}, inplace=True)
+        st.session_state.df_acesso_veiculos = df_temp
     else:
-        st.session_state.df_acesso_veiculos = pd.DataFrame(columns=column_names)
+        st.session_state.df_acesso_veiculos = pd.DataFrame(columns=[
+            "Nome", "RG/CPF", "Placa", "Marca do Carro", "Horário de Entrada",
+            "Horário de Saída", "Data", "Empresa", "Status da Entrada", "Motivo do Bloqueio", "Aprovador", "Data do Primeiro Registro"
+        ])
 
     # Adicionar ou editar registro
     with st.expander("Adicionar ou Editar Registro", expanded=True):
@@ -287,10 +291,12 @@ def blocks():
     if data_from_sheet:
         columns = data_from_sheet[0]
         df_current = pd.DataFrame(data_from_sheet[1:], columns=columns)
+        if 'RG' in df_current.columns and 'RG/CPF' not in df_current.columns:
+            df_current.rename(columns={'RG': 'RG/CPF'}, inplace=True)
     else:
         df_current = pd.DataFrame(columns=[
-            "ID", "Nome", "RG/CPF", "Placa", "Marca do Carro", "Horário de Entrada", 
-            "Data", "Empresa", "Status da Entrada", "Motivo do Bloqueio", "Aprovador", "Data do Primeiro Registro", "Horário de Saída"
+            "Nome", "RG/CPF", "Placa", "Marca do Carro", "Horário de Entrada", 
+            "Horário de Saída", "Data", "Empresa", "Status da Entrada", "Motivo do Bloqueio", "Aprovador", "Data do Primeiro Registro"
         ])
 
     blocked_info = check_blocked_records(df_current)
