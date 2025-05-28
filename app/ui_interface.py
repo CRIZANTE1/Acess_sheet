@@ -127,7 +127,14 @@ def vehicle_access_interface():
             rg = st.text_input("RG/CPF:", value=existing_record["RG/CPF"])
             placa = st.text_input("Placa do Carro (opcional):", value=existing_record["Placa"])
             marca_carro = st.text_input("Marca do Carro (opcional):", value=existing_record["Marca do Carro"])
-            data = st.date_input("Data:", value=datetime.strptime(existing_record["Data"], "%d/%m/%Y"))
+            
+            # Tratar a data para evitar ValueError
+            try:
+                data_value = datetime.strptime(existing_record["Data"], "%d/%m/%Y")
+            except (ValueError, TypeError):
+                data_value = datetime.now().date() # Valor padrão se a data for inválida ou vazia
+            data = st.date_input("Data:", value=data_value)
+            
             horario_entrada_value = existing_record["Horário de Entrada"]
             rounded_horario = round_to_nearest_interval(str(horario_entrada_value) if horario_entrada_value is not None else "")
             horario_entrada_index = horario_options.index(rounded_horario) if rounded_horario in horario_options else 0
