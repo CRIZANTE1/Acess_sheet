@@ -76,8 +76,8 @@ def add_record(name, rg_cpf, placa, marca_carro, horario_entrada, data, empresa,
         df = pd.DataFrame(data_from_sheet[1:], columns=columns)
     else:
         df = pd.DataFrame(columns=[
-            "ID", "Nome", "RG/CPF", "Placa", "Marca do Carro", "Horário de Entrada", 
-            "Data", "Empresa", "Status da Entrada", "Motivo do Bloqueio", "Aprovador", "Data do Primeiro Registro", "Horário de Saída"
+            "Nome", "RG/CPF", "Placa", "Marca do Carro", "Horário de Entrada", 
+            "Horário de Saída", "Data", "Empresa", "Status da Entrada", "Motivo do Bloqueio", "Aprovador", "Data do Primeiro Registro"
         ])
     
     df = initialize_columns(df)  # Certifique-se de que todas as colunas necessárias estão presentes
@@ -120,9 +120,10 @@ def add_record(name, rg_cpf, placa, marca_carro, horario_entrada, data, empresa,
         # Atualiza o registro existente
         record_id = existing_record["ID"].iloc[0]
         updated_data = [
-            name, rg_cpf, placa, marca_carro, horario_entrada, data_formatada, empresa, 
+            name, rg_cpf, placa, marca_carro, horario_entrada, 
+            existing_record.get("Horário de Saída", "").iloc[0], data_formatada, empresa, 
             status, motivo if motivo else "", aprovador if aprovador else "", 
-            existing_record["Data do Primeiro Registro"].iloc[0], existing_record.get("Horário de Saída", "").iloc[0]
+            existing_record["Data do Primeiro Registro"].iloc[0]
         ]
         sheet_operations.editar_dados(record_id, updated_data)
         return True
@@ -144,9 +145,10 @@ def add_record(name, rg_cpf, placa, marca_carro, horario_entrada, data, empresa,
                     first_registration_date = data_formatada
 
         new_record_list = [
-            name, rg_cpf, placa, marca_carro, horario_entrada, data_formatada, empresa, 
+            name, rg_cpf, placa, marca_carro, horario_entrada, "", # Horário de Saída vazio para novo registro
+            data_formatada, empresa, 
             status, motivo if motivo else "", aprovador if aprovador else "", 
-            first_registration_date, "" # Horário de Saída vazio para novo registro
+            first_registration_date
         ]
         sheet_operations.adc_dados(new_record_list)
         return True
@@ -320,4 +322,5 @@ def mouth_consult(): # Consulta por mês as entradas de uma pessoa especifica
                     st.warning(f"Nenhum registro encontrado para {name_to_check_month} no mês de {month_to_check.strftime('%B %Y')}.")
             else:
                 st.warning("Por favor, selecione o nome e o mês para consulta.")
+
 
