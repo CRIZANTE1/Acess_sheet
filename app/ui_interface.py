@@ -127,10 +127,16 @@ def vehicle_access_interface():
             # Campos para editar registro existente
             existing_record = st.session_state.df_acesso_veiculos[st.session_state.df_acesso_veiculos["Nome"] == name_to_add_or_edit].iloc[0]
             
+            # Debug dos dados
+            st.write("Debug - Colunas disponíveis:", existing_record.index.tolist())
+            st.write("Debug - Dados do registro:", existing_record.to_dict())
+            
             # Garantir que o RG/CPF seja preenchido mesmo se for nulo
             rg_cpf_value = existing_record.get("RG/CPF", "")
+            st.write("Debug - Valor do RG/CPF antes do tratamento:", rg_cpf_value)
             if pd.isna(rg_cpf_value):
                 rg_cpf_value = ""
+            st.write("Debug - Valor do RG/CPF depois do tratamento:", rg_cpf_value)
             rg = st.text_input("RG/CPF:", value=str(rg_cpf_value))
             
             placa = st.text_input("Placa do Carro (opcional):", value=existing_record["Placa"])
