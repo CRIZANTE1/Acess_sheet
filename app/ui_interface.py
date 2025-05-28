@@ -171,6 +171,14 @@ def vehicle_access_interface():
             # Campos para editar registro existente
             existing_record = st.session_state.df_acesso_veiculos[st.session_state.df_acesso_veiculos["Nome"] == name_to_add_or_edit].iloc[0]
             
+            # Mostrar informações atuais do registro
+            st.info(f"""
+            Informações atuais do registro:
+            - Horário de Entrada: {existing_record['Horário de Entrada']}
+            - Horário de Saída: {existing_record['Horário de Saída'] if existing_record['Horário de Saída'] else 'Não registrado'}
+            - Data: {existing_record['Data']}
+            """)
+            
             # Tratamento especial para o campo CPF para preservar números longos
             cpf_value = ""
             if "CPF" in existing_record:
@@ -403,13 +411,6 @@ def blocks():
         st.error("Registros Bloqueados:\n" + blocked_info)
     else:
         st.empty()
-
-
-
-
-
-
-
 
 
 
