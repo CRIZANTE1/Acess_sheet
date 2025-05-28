@@ -20,7 +20,7 @@ def load_data_from_sheets():
             st.session_state.df_acesso_veiculos = df
         else:
             st.session_state.df_acesso_veiculos = pd.DataFrame(columns=[
-            "ID", "Nome", "RG", "Placa", "Marca do Carro", "Horário de Entrada", 
+            "ID", "Nome", "CPF", "Placa", "Marca do Carro", "Horário de Entrada", 
             "Data", "Empresa", "Status da Entrada", "Motivo do Bloqueio", "Aprovador", "Data do Primeiro Registro", "Horário de Saída"
         ])
 
