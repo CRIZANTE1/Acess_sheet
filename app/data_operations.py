@@ -154,6 +154,7 @@ def add_record(name, CPF, placa, marca_carro, horario_entrada, horario_saida, da
                     first_registration_date = data_formatada
 
         new_record_list = [
+            "", # Placeholder para ID
             name,
             CPF,
             placa,
@@ -346,9 +347,13 @@ def mouth_consult(): # Consulta por mês as entradas de uma pessoa especifica
                     except locale.Error:
                         st.warning("Could not set locale for time formatting. Using default.")
                     st.write(f"Registros de {name_to_check_month} para o mês de {month_to_check.strftime('%B %Y')}:")
-                    st.dataframe(filtered_df.drop(columns=["CPF/CPF"], errors='ignore'))
+                    
+                    st.dataframe(filtered_df.drop(columns=["CPF"], errors='ignore'))
                 else:
                     st.warning(f"Nenhum registro encontrado para {name_to_check_month} no mês de {month_to_check.strftime('%B %Y')}.")
+            else:
+                st.warning("Por favor, selecione o nome e o mês para consulta.")
+
             else:
                 st.warning("Por favor, selecione o nome e o mês para consulta.")
 
