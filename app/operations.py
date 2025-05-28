@@ -58,8 +58,18 @@ class SheetOperations:
                 logging.warning(f"Nenhum cabeçalho válido encontrado na aba '{aba_name}'.")
                 return []
 
-            # Filtrar os dados para incluir apenas as colunas válidas
-            filtered_data = [[row[i] for i in valid_columns_indices] for row in data]
+            # Filtrar os dados para incluir apenas as colunas válidas e tratar valores vazios
+            filtered_data = []
+            filtered_data.append([header[i] for i in valid_columns_indices])  # Adiciona os cabeçalhos
+            
+            for row in data[1:]:  # Para cada linha de dados
+                filtered_row = []
+                for i in valid_columns_indices:
+                    value = row[i] if i < len(row) else ""  # Trata índices fora do range
+                    value = value.strip() if isinstance(value, str) else value  # Remove espaços em branco
+                    value = "" if value is None else value  # Converte None para string vazia
+                    filtered_row.append(value)
+                filtered_data.append(filtered_row)
             
             logging.info(f"Dados da aba '{aba_name}' lidos e filtrados com sucesso.")
             return filtered_data
@@ -146,4 +156,6 @@ class SheetOperations:
         except Exception as e:
             logging.error(f"Erro ao excluir dados: {e}", exc_info=True)
             return False
+
+
 
