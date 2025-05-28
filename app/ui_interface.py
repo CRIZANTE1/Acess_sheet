@@ -132,10 +132,22 @@ def vehicle_access_interface():
                 else:
                     cpf = format_cpf(cpf)
             
-            placa = st.text_input("Placa do Carro (opcional):")
-            marca_carro = st.text_input("Marca do Carro (opcional):")
+            # Adicionar checkbox para controle de veículo
+            com_veiculo = st.checkbox("Entrada com veículo")
+            
+            # Campos de veículo só aparecem se a checkbox estiver marcada
+            if com_veiculo:
+                placa = st.text_input("Placa do Carro:")
+                marca_carro = st.text_input("Marca do Carro:")
+            else:
+                placa = ""
+                marca_carro = ""
+            
             data = st.date_input("Data:")
-            horario_entrada = st.selectbox("Horário de Entrada:", options=horario_options, index=horario_options.index(default_horario))
+            # Definir horário atual como padrão
+            horario_atual = datetime.now().strftime("%H:%M")
+            horario_index = horario_options.index(round_to_nearest_interval(horario_atual)) if round_to_nearest_interval(horario_atual) in horario_options else 0
+            horario_entrada = st.selectbox("Horário de Entrada:", options=horario_options, index=horario_index)
             empresa = st.text_input("Empresa:")
             status = st.selectbox("Status de Entrada", ["Autorizado", "Bloqueado"], index=0)
             motivo = st.text_input("Motivo do Bloqueio") if status == "Bloqueado" else ""
@@ -205,8 +217,17 @@ def vehicle_access_interface():
                 else:
                     cpf = format_cpf(cpf)
             
-            placa = st.text_input("Placa do Carro (opcional):", value=existing_record["Placa"])
-            marca_carro = st.text_input("Marca do Carro (opcional):", value=existing_record["Marca do Carro"])
+            # Adicionar checkbox para controle de veículo
+            tem_veiculo = existing_record["Placa"] != "" or existing_record["Marca do Carro"] != ""
+            com_veiculo = st.checkbox("Entrada com veículo", value=tem_veiculo)
+            
+            # Campos de veículo só aparecem se a checkbox estiver marcada
+            if com_veiculo:
+                placa = st.text_input("Placa do Carro:", value=existing_record["Placa"])
+                marca_carro = st.text_input("Marca do Carro:", value=existing_record["Marca do Carro"])
+            else:
+                placa = ""
+                marca_carro = ""
             
             # Tratar a data para evitar ValueError
             try:
@@ -411,10 +432,6 @@ def blocks():
         st.error("Registros Bloqueados:\n" + blocked_info)
     else:
         st.empty()
-
-
-
-
 
 
 
