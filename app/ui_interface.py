@@ -146,7 +146,7 @@ def vehicle_access_interface():
             )
             empresa = st.text_input("Empresa:", value=existing_record["Empresa"])
 
-            status_options = ["Autorizado", "Bloqueado"]
+            status_options = ["Autorizado", "Bloqueada"]
             status_value = existing_record["Status da Entrada"]
             if pd.isna(status_value) or status_value not in status_options:
                 status_value = status_options[0]
@@ -156,10 +156,10 @@ def vehicle_access_interface():
                 status_options,
                 index=status_options.index(status_value)
             )
-            motivo = st.text_input("Motivo do Bloqueio", value=existing_record["Motivo do Bloqueio"]) if status == "Bloqueado" else ""
+            motivo = st.text_input("Motivo do Bloqueio", value=existing_record["Motivo do Bloqueio"]) if status == "Bloqueada" else ""
             aprovador = st.text_input("Aprovador", value=existing_record["Aprovador"]) if status == "Autorizado" else ""
 
-            if status == "Bloqueado":
+            if status == "Bloqueada":
                 st.warning("A liberação só pode ser feita pelo responsável por profissional dá área responsável ou Gestor da UO.")
 
             if st.button("Atualizar Registro"):
@@ -268,7 +268,7 @@ def vehicle_access_interface():
     
     # Consulta Geral de Pessoas Autorizadas e Bloqueadas
     with st.expander("Consulta Geral de Pessoas Autorizadas e Bloqueadas", expanded=False):
-        status_filter = st.selectbox("Selecione o Status para Consulta:", ["Todos", "Autorizado", "Bloqueado"])
+        status_filter = st.selectbox("Selecione o Status para Consulta:", ["Todos", "Autorizada", "Bloqueada"])
         empresa_filter = st.selectbox("Selecione a Empresa para Consulta:", ["Todas"] + list(st.session_state.df_acesso_veiculos["Empresa"].unique()))
 
         if st.button("Consultar"):
@@ -312,6 +312,10 @@ def blocks():
         st.error("Registros Bloqueados:\n" + blocked_info)
     else:
         st.empty()
+
+
+
+
 
 
 
