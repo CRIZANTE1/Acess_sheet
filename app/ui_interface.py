@@ -156,7 +156,7 @@ def vehicle_access_interface():
                 status_options,
                 index=status_options.index(status_value)
             )
-            motivo = st.text_input("Motivo do Bloqueio", value=existing_record["Motivo do Bloqueio"]) if status == "Bloqueada" else ""
+            motivo = st.text_input("Motivo do Bloqueio", value=existing_record["Motivo do Bloqueio"]) if status == "Bloqueado" else ""
             aprovador = st.text_input("Aprovador", value=existing_record["Aprovador"]) if status == "Autorizado" else ""
 
             if status == "Bloqueada":
