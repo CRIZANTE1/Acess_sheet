@@ -98,6 +98,7 @@ def vehicle_access_interface():
                     data_formatada = data_obj.strftime("%d/%m/%Y")
 
                     success = add_record(
+                        "", # Placeholder para ID
                         name, CPF, placa, marca_carro, 
                         horario_entrada, 
                         "", # Horário de Saída (vazio inicialmente)
@@ -159,6 +160,7 @@ def vehicle_access_interface():
                         placa, 
                         marca_carro, 
                         horario_entrada, 
+                        existing_record.get("Horário de Saída", ""), # Passar o horário de saída existente
                         data_formatada,
                         empresa, 
                         status, 
@@ -296,3 +298,4 @@ def blocks():
         st.error("Registros Bloqueados:\n" + blocked_info)
     else:
         st.empty()
+
