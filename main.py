@@ -11,18 +11,18 @@ from app.operations import SheetOperations
 st.set_page_config(page_title="Controle de Acesso BAERI", layout="wide")
 
 def load_data_from_sheets():
-    if "df_acesso_veiculos" not in st.session_state:
-        sheet_operations = SheetOperations()
-        data = sheet_operations.carregar_dados()
-        if data:
-            columns = data[0]
-            df = pd.DataFrame(data[1:], columns=columns)
-            st.session_state.df_acesso_veiculos = df
-        else:
-            st.session_state.df_acesso_veiculos = pd.DataFrame(columns=[
-            "ID", "Nome", "CPF", "Placa", "Marca do Carro", "Horário de Entrada", "Horário de Saída", 
-            "Data", "Empresa", "Status da Entrada", "Motivo do Bloqueio", "Aprovador", "Data do Primeiro Registro"
-        ])
+    # Forçar atualização dos dados
+    sheet_operations = SheetOperations()
+    data = sheet_operations.carregar_dados()
+    if data:
+        columns = data[0]
+        df = pd.DataFrame(data[1:], columns=columns)
+        st.session_state.df_acesso_veiculos = df
+    else:
+        st.session_state.df_acesso_veiculos = pd.DataFrame(columns=[
+        "ID", "Nome", "CPF", "Placa", "Marca do Carro", "Horário de Entrada", "Horário de Saída", 
+        "Data", "Empresa", "Status da Entrada", "Motivo do Bloqueio", "Aprovador", "Data do Primeiro Registro"
+    ])
 
 def main():
     load_data_from_sheets()
@@ -59,4 +59,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
