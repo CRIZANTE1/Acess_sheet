@@ -154,7 +154,6 @@ def add_record(name, CPF, placa, marca_carro, horario_entrada, horario_saida, da
                     first_registration_date = data_formatada
 
         new_record_list = [
-            "", # Placeholder para ID
             name,
             CPF,
             placa,
