@@ -74,11 +74,6 @@ def add_record(name, cpf, placa, marca_carro, horario_entrada, data, empresa, st
         # A primeira linha são os cabeçalhos
         columns = data_from_sheet[0]
         df = pd.DataFrame(data_from_sheet[1:], columns=columns)
-        # Renomear colunas antigas para CPF
-        if 'RG' in df.columns:
-            df.rename(columns={'RG': 'CPF'}, inplace=True)
-        if 'RG/CPF' in df.columns:
-            df.rename(columns={'RG/CPF': 'CPF'}, inplace=True)
     else:
         df = pd.DataFrame(columns=[
             "Nome", "CPF", "Placa", "Marca do Carro", "Horário de Entrada", 
@@ -168,11 +163,6 @@ def update_exit_time(name, date, new_exit_time):
 
     columns = data_from_sheet[0]
     df = pd.DataFrame(data_from_sheet[1:], columns=columns)
-    # Renomear colunas antigas para CPF
-    if 'RG' in df.columns:
-        df.rename(columns={'RG': 'CPF'}, inplace=True)
-    if 'RG/CPF' in df.columns:
-        df.rename(columns={'RG/CPF': 'CPF'}, inplace=True)
 
     # Encontrar o registro
     record_to_update = df[(df["Nome"] == name) & (df["Data"] == date)]
@@ -344,7 +334,6 @@ def mouth_consult(): # Consulta por mês as entradas de uma pessoa especifica
                     st.warning(f"Nenhum registro encontrado para {name_to_check_month} no mês de {month_to_check.strftime('%B %Y')}.")
             else:
                 st.warning("Por favor, selecione o nome e o mês para consulta.")
-
 
 
 
