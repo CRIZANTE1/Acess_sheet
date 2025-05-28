@@ -15,7 +15,7 @@ def show_progress_bar(progress_placeholder):
 def initialize_columns(df):
     """Certifica-se de que todas as colunas necessárias estão presentes no DataFrame"""
     required_columns = [
-        "Nome", "RG", "Placa", "Marca do Carro", "Horário de Entrada", 
+        "Nome", "RG/CPF", "Placa", "Marca do Carro", "Horário de Entrada", 
         "Data", "Empresa", "Status da Entrada", "Motivo do Bloqueio", "Aprovador", "Data do Primeiro Registro"
     ]
     for column in required_columns:
@@ -65,7 +65,7 @@ def check_briefing_needed(df, name, current_date):
         st.error(f"Erro ao processar datas: {str(e)}")
         return False, None
 
-def add_record(name, rg, placa, marca_carro, horario_entrada, data, empresa, status, motivo=None, aprovador=None):
+def add_record(name, rg_cpf, placa, marca_carro, horario_entrada, data, empresa, status, motivo=None, aprovador=None):
     sheet_operations = SheetOperations()
     
     # Carregar dados existentes para verificar e adicionar
@@ -76,7 +76,7 @@ def add_record(name, rg, placa, marca_carro, horario_entrada, data, empresa, sta
         df = pd.DataFrame(data_from_sheet[1:], columns=columns)
     else:
         df = pd.DataFrame(columns=[
-            "ID", "Nome", "RG", "Placa", "Marca do Carro", "Horário de Entrada", 
+            "ID", "Nome", "RG/CPF", "Placa", "Marca do Carro", "Horário de Entrada", 
             "Data", "Empresa", "Status da Entrada", "Motivo do Bloqueio", "Aprovador", "Data do Primeiro Registro", "Horário de Saída"
         ])
     
@@ -120,7 +120,7 @@ def add_record(name, rg, placa, marca_carro, horario_entrada, data, empresa, sta
         # Atualiza o registro existente
         record_id = existing_record["ID"].iloc[0]
         updated_data = [
-            name, rg, placa, marca_carro, horario_entrada, data_formatada, empresa, 
+            name, rg_cpf, placa, marca_carro, horario_entrada, data_formatada, empresa, 
             status, motivo if motivo else "", aprovador if aprovador else "", 
             existing_record["Data do Primeiro Registro"].iloc[0], existing_record.get("Horário de Saída", "").iloc[0]
         ]
@@ -144,7 +144,7 @@ def add_record(name, rg, placa, marca_carro, horario_entrada, data, empresa, sta
                     first_registration_date = data_formatada
 
         new_record_list = [
-            name, rg, placa, marca_carro, horario_entrada, data_formatada, empresa, 
+            name, rg_cpf, placa, marca_carro, horario_entrada, data_formatada, empresa, 
             status, motivo if motivo else "", aprovador if aprovador else "", 
             first_registration_date, "" # Horário de Saída vazio para novo registro
         ]
@@ -320,3 +320,4 @@ def mouth_consult(): # Consulta por mês as entradas de uma pessoa especifica
                     st.warning(f"Nenhum registro encontrado para {name_to_check_month} no mês de {month_to_check.strftime('%B %Y')}.")
             else:
                 st.warning("Por favor, selecione o nome e o mês para consulta.")
+
