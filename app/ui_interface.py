@@ -64,8 +64,8 @@ def vehicle_access_interface():
         st.session_state.df_acesso_veiculos = pd.DataFrame(data_from_sheet[1:], columns=columns)
     else:
         st.session_state.df_acesso_veiculos = pd.DataFrame(columns=[
-            "ID", "Nome", "CPF", "Placa", "Marca do Carro", "Horário de Entrada", 
-            "Data", "Empresa", "Status da Entrada", "Motivo do Bloqueio", "Aprovador", "Data do Primeiro Registro", "Horário de Saída"
+            "ID", "Nome", "CPF", "Placa", "Marca do Carro", "Horário de Entrada", "Horário de Saída", 
+            "Data", "Empresa", "Status da Entrada", "Motivo do Bloqueio", "Aprovador", "Data do Primeiro Registro"
         ])
 
     # Adicionar ou editar registro
@@ -100,6 +100,7 @@ def vehicle_access_interface():
                     success = add_record(
                         name, CPF, placa, marca_carro, 
                         horario_entrada, 
+                        "", # Horário de Saída (vazio inicialmente)
                         data_formatada,
                         empresa, 
                         status, 
@@ -295,4 +296,3 @@ def blocks():
         st.error("Registros Bloqueados:\n" + blocked_info)
     else:
         st.empty()
-
