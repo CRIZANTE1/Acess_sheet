@@ -120,11 +120,13 @@ def add_record(name, cpf, placa, marca_carro, horario_entrada, data, empresa, st
     if not existing_record.empty:
         # Atualiza o registro existente
         record_id = existing_record["ID"].iloc[0]
+        horario_saida = existing_record["Horário de Saída"].iloc[0] if "Horário de Saída" in existing_record else ""
         updated_data = [
             name, cpf, placa, marca_carro, horario_entrada, 
-            existing_record.get("Horário de Saída", ""), data_formatada, empresa, 
+            horario_saida,  # Mantém o horário de saída existente
+            data_formatada, empresa, 
             status, motivo if motivo else "", aprovador if aprovador else "", 
-            existing_record["Data do Primeiro Registro"]
+            existing_record["Data do Primeiro Registro"].iloc[0]
         ]
         # A API editar_dados precisa do ID para identificar a linha, mas o ID não faz parte dos dados da linha
         success = sheet_operations.editar_dados(record_id, updated_data)
@@ -374,6 +376,7 @@ def mouth_consult(): # Consulta por mês as entradas de uma pessoa especifica
                     st.warning(f"Nenhum registro encontrado para {name_to_check_month} no mês de {month_to_check.strftime('%B %Y')}.")
             else:
                 st.warning("Por favor, selecione o nome e o mês para consulta.")
+
 
 
 
