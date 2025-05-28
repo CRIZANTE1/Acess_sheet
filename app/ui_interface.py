@@ -287,7 +287,7 @@ def blocks():
         df_current = pd.DataFrame(data_from_sheet[1:], columns=columns)
     else:
         df_current = pd.DataFrame(columns=[
-            "ID", "Nome", "CPF", "Placa", "Marca do Carro", "Horário de Entrada", 
+            "Nome", "CPF", "Placa", "Marca do Carro", "Horário de Entrada", 
             "Data", "Empresa", "Status da Entrada", "Motivo do Bloqueio", "Aprovador", "Data do Primeiro Registro", "Horário de Saída"
         ])
 
@@ -297,4 +297,3 @@ def blocks():
         st.error("Registros Bloqueados:\n" + blocked_info)
     else:
         st.empty()
-
