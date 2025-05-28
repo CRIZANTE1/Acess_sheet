@@ -120,9 +120,18 @@ def add_record(name, CPF, placa, marca_carro, horario_entrada, horario_saida, da
         # Atualiza o registro existente
         record_id = existing_record["ID"].iloc[0]
         updated_data = [
-            name, CPF, placa, marca_carro, horario_entrada, data_formatada, empresa, 
-            status, motivo if motivo else "", aprovador if aprovador else "", 
-            existing_record["Data do Primeiro Registro"].iloc[0], existing_record.get("Horário de Saída", "").iloc[0]
+            name,
+            CPF,
+            placa,
+            marca_carro,
+            horario_entrada,
+            existing_record.get("Horário de Saída", "").iloc[0], # Horário de Saída na posição correta
+            data_formatada,
+            empresa,
+            status,
+            motivo if motivo else "",
+            aprovador if aprovador else "",
+            existing_record["Data do Primeiro Registro"].iloc[0] if "Data do Primeiro Registro" in existing_record.columns else ""
         ]
         sheet_operations.editar_dados(record_id, updated_data)
         return True
@@ -332,3 +341,4 @@ def mouth_consult(): # Consulta por mês as entradas de uma pessoa especifica
                     st.warning(f"Nenhum registro encontrado para {name_to_check_month} no mês de {month_to_check.strftime('%B %Y')}.")
             else:
                 st.warning("Por favor, selecione o nome e o mês para consulta.")
+
