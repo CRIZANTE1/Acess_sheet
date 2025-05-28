@@ -79,7 +79,7 @@ def vehicle_access_interface():
         if name_to_add_or_edit == "Novo Registro":
             # Campos para adicionar novo registro
             name = st.text_input("Nome:")
-            rg = st.text_input("RG:")
+            rg = st.text_input("RG/CPG:")
             placa = st.text_input("Placa do Carro (opcional):")
             marca_carro = st.text_input("Marca do Carro (opcional):")
             data = st.date_input("Data:")
@@ -114,12 +114,12 @@ def vehicle_access_interface():
                     else:
                         st.error("Falha ao adicionar registro.")
                 else:
-                    st.warning("Por favor, preencha todos os campos obrigatórios: Nome, RG, Horário de Entrada, Data e Empresa.")
+                    st.warning("Por favor, preencha todos os campos obrigatórios: Nome, RG/CPF, Horário de Entrada, Data e Empresa.")
         else:
             # Campos para editar registro existente
             existing_record = st.session_state.df_acesso_veiculos[st.session_state.df_acesso_veiculos["Nome"] == name_to_add_or_edit].iloc[0]
             
-            rg = st.text_input("RG:", value=existing_record["RG"])
+            rg = st.text_input("RG:", value=existing_record["RG/CPF"])
             placa = st.text_input("Placa do Carro (opcional):", value=existing_record["Placa"])
             marca_carro = st.text_input("Marca do Carro (opcional):", value=existing_record["Marca do Carro"])
             data = st.date_input("Data:", value=datetime.strptime(existing_record["Data"], "%d/%m/%Y"))
