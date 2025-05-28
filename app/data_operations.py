@@ -146,6 +146,7 @@ def add_record(name, rg_cpf, placa, marca_carro, horario_entrada, data, empresa,
                     first_registration_date = data_formatada
 
         new_record_list = [
+            "", # Espaço reservado para o ID que será gerado em adc_dados
             name, rg_cpf, placa, marca_carro, horario_entrada, "", # Horário de Saída vazio para novo registro
             data_formatada, empresa, 
             status, motivo if motivo else "", aprovador if aprovador else "", 
@@ -153,7 +154,6 @@ def add_record(name, rg_cpf, placa, marca_carro, horario_entrada, data, empresa,
         ]
         sheet_operations.adc_dados(new_record_list)
         return True
-
 
 def update_exit_time(name, date, new_exit_time):
     sheet_operations = SheetOperations()
@@ -335,5 +335,6 @@ def mouth_consult(): # Consulta por mês as entradas de uma pessoa especifica
                     st.warning(f"Nenhum registro encontrado para {name_to_check_month} no mês de {month_to_check.strftime('%B %Y')}.")
             else:
                 st.warning("Por favor, selecione o nome e o mês para consulta.")
+
 
 
