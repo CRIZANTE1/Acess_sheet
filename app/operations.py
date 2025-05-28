@@ -66,8 +66,17 @@ class SheetOperations:
                 filtered_row = []
                 for i in valid_columns_indices:
                     value = row[i] if i < len(row) else ""  # Trata índices fora do range
-                    value = value.strip() if isinstance(value, str) else value  # Remove espaços em branco
-                    value = "" if value is None else value  # Converte None para string vazia
+                    
+                    # Tratamento especial para preservar números longos
+                    if isinstance(value, (int, float)) or (isinstance(value, str) and value.replace('.','').replace(',','').isdigit()):
+                        try:
+                            # Tenta converter para número e depois para string para remover notação científica
+                            value = str(int(float(str(value).replace(',', '').replace('.', ''))))
+                        except (ValueError, TypeError):
+                            value = str(value).strip()
+                    else:
+                        value = str(value).strip() if value is not None else ""
+                    
                     filtered_row.append(value)
                 filtered_data.append(filtered_row)
             
@@ -156,6 +165,7 @@ class SheetOperations:
         except Exception as e:
             logging.error(f"Erro ao excluir dados: {e}", exc_info=True)
             return False
+
 
 
 
