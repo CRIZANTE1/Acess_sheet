@@ -121,10 +121,11 @@ def add_record(name, rg_cpf, placa, marca_carro, horario_entrada, data, empresa,
         record_id = existing_record["ID"].iloc[0]
         updated_data = [
             name, rg_cpf, placa, marca_carro, horario_entrada, 
-            existing_record.get("Horário de Saída", "").iloc[0], data_formatada, empresa, 
+            existing_record.get("Horário de Saída", ""), data_formatada, empresa, 
             status, motivo if motivo else "", aprovador if aprovador else "", 
-            existing_record["Data do Primeiro Registro"].iloc[0]
+            existing_record["Data do Primeiro Registro"]
         ]
+        # A API editar_dados precisa do ID para identificar a linha, mas o ID não faz parte dos dados da linha
         sheet_operations.editar_dados(record_id, updated_data)
         return True
     else:
@@ -169,14 +170,26 @@ def update_exit_time(name, date, new_exit_time):
 
     if not record_to_update.empty:
         record_id = record_to_update["ID"].iloc[0]
-        
         # Criar uma cópia da linha para modificação
         updated_row_df = record_to_update.copy()
         updated_row_df["Horário de Saída"] = new_exit_time
         
-        # Converter o DataFrame de volta para uma lista na ordem correta das colunas
-        # Excluir a coluna 'ID' antes de passar para editar_dados
-        updated_data_list = updated_row_df.drop(columns=["ID"]).iloc[0].tolist()
+        # Garantir que a lista de dados corresponda à estrutura da planilha
+        # A ordem das colunas na planilha é: Nome, RG/CPF, Placa, Marca do Carro, Horário de Entrada, Horário de Saída, Data, Empresa, Status da Entrada, Motivo do Bloqueio, Aprovador, Data do Primeiro Registro
+        updated_data_list = [
+            updated_row_df["Nome"].iloc[0],
+            updated_row_df["RG/CPF"].iloc[0],
+            updated_row_df["Placa"].iloc[0],
+            updated_row_df["Marca do Carro"].iloc[0],
+            updated_row_df["Horário de Entrada"].iloc[0],
+            updated_row_df["Horário de Saída"].iloc[0], # Novo horário de saída
+            updated_row_df["Data"].iloc[0],
+            updated_row_df["Empresa"].iloc[0],
+            updated_row_df["Status da Entrada"].iloc[0],
+            updated_row_df["Motivo do Bloqueio"].iloc[0],
+            updated_row_df["Aprovador"].iloc[0],
+            updated_row_df["Data do Primeiro Registro"].iloc[0]
+        ]
         
         success = sheet_operations.editar_dados(record_id, updated_data_list)
         if success:
