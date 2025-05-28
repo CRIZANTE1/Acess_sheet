@@ -164,39 +164,69 @@ def update_exit_time(name, date, new_exit_time):
     columns = data_from_sheet[0]
     df = pd.DataFrame(data_from_sheet[1:], columns=columns)
 
-    # Encontrar o registro
-    record_to_update = df[(df["Nome"] == name) & (df["Data"] == date)]
+    # Converter a data de pesquisa para datetime para comparação
+    try:
+        search_date = datetime.strptime(date, "%d/%m/%Y")
+    except ValueError:
+        return False, "Data em formato inválido."
 
-    if not record_to_update.empty:
-        record_id = record_to_update["ID"].iloc[0]
-        # Criar uma cópia da linha para modificação
-        updated_row_df = record_to_update.copy()
-        updated_row_df["Horário de Saída"] = new_exit_time
-        
-        # Garantir que a lista de dados corresponda à estrutura da planilha
-        # A ordem das colunas na planilha é: Nome, CPF, Placa, Marca do Carro, Horário de Entrada, Horário de Saída, Data, Empresa, Status da Entrada, Motivo do Bloqueio, Aprovador, Data do Primeiro Registro
-        updated_data_list = [
-            updated_row_df["Nome"].iloc[0],
-            updated_row_df["CPF"].iloc[0],
-            updated_row_df["Placa"].iloc[0],
-            updated_row_df["Marca do Carro"].iloc[0],
-            updated_row_df["Horário de Entrada"].iloc[0],
-            updated_row_df["Horário de Saída"].iloc[0], # Novo horário de saída
-            updated_row_df["Data"].iloc[0],
-            updated_row_df["Empresa"].iloc[0],
-            updated_row_df["Status da Entrada"].iloc[0],
-            updated_row_df["Motivo do Bloqueio"].iloc[0],
-            updated_row_df["Aprovador"].iloc[0],
-            updated_row_df["Data do Primeiro Registro"].iloc[0]
-        ]
-        
-        success = sheet_operations.editar_dados(record_id, updated_data_list)
-        if success:
-            return True, "Horário de saída atualizado com sucesso!"
-        else:
-            return False, "Erro ao atualizar horário de saída no Google Sheets."
+    # Encontrar todos os registros da pessoa
+    person_records = df[df["Nome"] == name].copy()
+    
+    if person_records.empty:
+        return False, "Nenhum registro encontrado para esta pessoa."
+
+    # Converter as datas dos registros para datetime
+    person_records['Data_dt'] = pd.to_datetime(person_records['Data'], format='%d/%m/%Y')
+    
+    # Filtrar registros sem horário de saída e ordenar por data
+    open_records = person_records[
+        (person_records['Horário de Saída'].isna()) | 
+        (person_records['Horário de Saída'] == '')
+    ].sort_values('Data_dt')
+
+    if open_records.empty:
+        return False, "Não há registros em aberto para esta pessoa."
+
+    # Encontrar o registro mais próximo da data informada
+    closest_record = None
+    min_days_diff = float('inf')
+    
+    for _, record in open_records.iterrows():
+        days_diff = abs((search_date - record['Data_dt']).days)
+        if days_diff < min_days_diff:
+            min_days_diff = days_diff
+            closest_record = record
+
+    if closest_record is None:
+        return False, "Nenhum registro encontrado próximo à data informada."
+
+    # Criar uma cópia da linha para modificação
+    record_id = closest_record["ID"]
+    updated_row_df = closest_record.copy()
+    updated_row_df["Horário de Saída"] = new_exit_time
+    
+    # Garantir que a lista de dados corresponda à estrutura da planilha
+    updated_data_list = [
+        updated_row_df["Nome"],
+        updated_row_df["CPF"],
+        updated_row_df["Placa"],
+        updated_row_df["Marca do Carro"],
+        updated_row_df["Horário de Entrada"],
+        updated_row_df["Horário de Saída"], # Novo horário de saída
+        updated_row_df["Data"],
+        updated_row_df["Empresa"],
+        updated_row_df["Status da Entrada"],
+        updated_row_df["Motivo do Bloqueio"],
+        updated_row_df["Aprovador"],
+        updated_row_df["Data do Primeiro Registro"]
+    ]
+    
+    success = sheet_operations.editar_dados(record_id, updated_data_list)
+    if success:
+        return True, f"Horário de saída atualizado com sucesso! (Registro do dia {updated_row_df['Data']})"
     else:
-        return False, "Registro não encontrado para atualização."
+        return False, "Erro ao atualizar horário de saída no Google Sheets."
 
 
 def delete_record(name, data):
@@ -334,6 +364,10 @@ def mouth_consult(): # Consulta por mês as entradas de uma pessoa especifica
                     st.warning(f"Nenhum registro encontrado para {name_to_check_month} no mês de {month_to_check.strftime('%B %Y')}.")
             else:
                 st.warning("Por favor, selecione o nome e o mês para consulta.")
+
+
+
+
 
 
 
