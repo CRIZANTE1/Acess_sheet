@@ -98,7 +98,6 @@ def vehicle_access_interface():
                     data_formatada = data_obj.strftime("%d/%m/%Y")
 
                     success = add_record(
-                        "", # Placeholder para ID
                         name, CPF, placa, marca_carro, 
                         horario_entrada, 
                         "", # Horário de Saída (vazio inicialmente)
