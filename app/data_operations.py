@@ -199,7 +199,7 @@ def update_exit_time(name, date, new_exit_time):
         return False, "Registro não encontrado para atualização."
 
 
-def delete_record_by_id(record_id):
+def delete_record(record_id):
     sheet_operations = SheetOperations()
     success = sheet_operations.excluir_dados(record_id)
     if success:
