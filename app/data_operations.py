@@ -146,10 +146,9 @@ def add_record(name, rg_cpf, placa, marca_carro, horario_entrada, data, empresa,
                     first_registration_date = data_formatada
 
         new_record_list = [
-            "", # Espaço reservado para o ID que será gerado em adc_dados
             name, rg_cpf, placa, marca_carro, horario_entrada, "", # Horário de Saída vazio para novo registro
-            data_formatada, empresa, 
-            status, motivo if motivo else "", aprovador if aprovador else "", 
+            data_formatada, empresa,
+            status, motivo if motivo else "", aprovador if aprovador else "",
             first_registration_date
         ]
         sheet_operations.adc_dados(new_record_list)
