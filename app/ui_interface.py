@@ -102,11 +102,6 @@ def vehicle_access_interface():
         # Use the actual headers from the sheet
         columns = data_from_sheet[0]
         df_temp = pd.DataFrame(data_from_sheet[1:], columns=columns)
-        # Renomear 'RG' ou 'RG/CPF' para 'CPF'
-        if 'RG' in df_temp.columns:
-            df_temp.rename(columns={'RG': 'CPF'}, inplace=True)
-        if 'RG/CPF' in df_temp.columns:
-            df_temp.rename(columns={'RG/CPF': 'CPF'}, inplace=True)
         
         # Garantir que valores nulos ou vazios sejam tratados corretamente
         df_temp = df_temp.fillna("")
@@ -180,8 +175,6 @@ def vehicle_access_interface():
             cpf_value = ""
             if "CPF" in existing_record:
                 cpf_value = str(existing_record["CPF"])
-            elif "RG/CPF" in existing_record:
-                cpf_value = str(existing_record["RG/CPF"])
                 
             # Garantir que o valor seja uma string e remover formatação científica
             if pd.isna(cpf_value) or cpf_value is None or cpf_value == "nan":
@@ -378,10 +371,6 @@ def blocks():
     if data_from_sheet:
         columns = data_from_sheet[0]
         df_current = pd.DataFrame(data_from_sheet[1:], columns=columns)
-        if 'RG' in df_current.columns:
-            df_current.rename(columns={'RG': 'CPF'}, inplace=True)
-        if 'RG/CPF' in df_current.columns:
-            df_current.rename(columns={'RG/CPF': 'CPF'}, inplace=True)
     else:
         df_current = pd.DataFrame(columns=[
             "Nome", "CPF", "Placa", "Marca do Carro", "Horário de Entrada", 
