@@ -137,24 +137,24 @@ def vehicle_access_interface():
             # Campos para editar registro existente
             existing_record = st.session_state.df_acesso_veiculos[st.session_state.df_acesso_veiculos["Nome"] == name_to_add_or_edit].iloc[0]
             
-            # Debug dos dados
-            st.write("Debug - Colunas disponíveis:", existing_record.index.tolist())
-            st.write("Debug - Dados do registro:", existing_record.to_dict())
-            
-            # Tratamento especial para o campo RG/CPF
+            # Tratamento especial para o campo RG/CPF para preservar números longos
             rg_cpf_value = ""
             if "RG/CPF" in existing_record:
-                rg_cpf_value = existing_record["RG/CPF"]
+                rg_cpf_value = str(existing_record["RG/CPF"])
             elif "RG" in existing_record:
-                rg_cpf_value = existing_record["RG"]
+                rg_cpf_value = str(existing_record["RG"])
                 
-            # Garantir que o valor não seja nulo ou NaN
+            # Garantir que o valor seja uma string e remover formatação científica
             if pd.isna(rg_cpf_value) or rg_cpf_value is None or rg_cpf_value == "nan":
                 rg_cpf_value = ""
             else:
-                rg_cpf_value = str(rg_cpf_value).strip()
-                
-            st.write("Debug - Valor final do RG/CPF:", rg_cpf_value)
+                try:
+                    # Tenta converter para número e depois para string para remover notação científica
+                    rg_cpf_value = str(int(float(str(rg_cpf_value).replace(',', '').replace('.', ''))))
+                except (ValueError, TypeError):
+                    # Se falhar, usa o valor original limpo
+                    rg_cpf_value = str(rg_cpf_value).strip()
+            
             rg = st.text_input("RG/CPF:", value=rg_cpf_value)
             
             placa = st.text_input("Placa do Carro (opcional):", value=existing_record["Placa"])
@@ -344,6 +344,7 @@ def blocks():
         st.error("Registros Bloqueados:\n" + blocked_info)
     else:
         st.empty()
+
 
 
 
