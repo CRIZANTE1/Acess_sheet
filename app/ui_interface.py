@@ -123,11 +123,14 @@ def vehicle_access_interface():
             placa = st.text_input("Placa do Carro (opcional):", value=existing_record["Placa"])
             marca_carro = st.text_input("Marca do Carro (opcional):", value=existing_record["Marca do Carro"])
             data = st.date_input("Data:", value=datetime.strptime(existing_record["Data"], "%d/%m/%Y"))
+            horario_entrada_value = existing_record["Horário de Entrada"]
+            rounded_horario = round_to_nearest_interval(str(horario_entrada_value) if horario_entrada_value is not None else "")
+            horario_entrada_index = horario_options.index(rounded_horario) if rounded_horario in horario_options else 0
+
             horario_entrada = st.selectbox(
                 "Horário de Entrada:",
                 options=horario_options,
-                index=horario_options.index(round_to_nearest_interval(existing_record["Horário de Entrada"]))
-                if existing_record["Horário de Entrada"] not in [None, ""] else 0
+                index=horario_entrada_index
             )
             empresa = st.text_input("Empresa:", value=existing_record["Empresa"])
 
@@ -295,3 +298,4 @@ def blocks():
         st.error("Registros Bloqueados:\n" + blocked_info)
     else:
         st.empty()
+
