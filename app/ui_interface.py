@@ -63,9 +63,12 @@ def vehicle_access_interface():
         # Use the actual headers from the sheet
         columns = data_from_sheet[0]
         df_temp = pd.DataFrame(data_from_sheet[1:], columns=columns)
-        # Rename 'RG' to 'RG/CPF' if 'RG' exists
+        # Rename 'RG' to 'RG/CPF' if 'RG' exists and handle empty values
         if 'RG' in df_temp.columns and 'RG/CPF' not in df_temp.columns:
             df_temp.rename(columns={'RG': 'RG/CPF'}, inplace=True)
+        
+        # Garantir que valores nulos ou vazios sejam tratados corretamente
+        df_temp = df_temp.fillna("")
         st.session_state.df_acesso_veiculos = df_temp
     else:
         st.session_state.df_acesso_veiculos = pd.DataFrame(columns=[
@@ -95,7 +98,7 @@ def vehicle_access_interface():
             aprovador = st.text_input("Aprovador") if status == "Autorizado" else ""
 
             if status == "Bloqueado":
-                st.warning("A liberação só pode ser feita pelo responsável pela segurança ou gerente.")
+                st.warning("A liberação só pode ser feita por profissional da área responsável ou Gestor da UO.")
 
             if st.button("Adicionar Registro"):
                 if name and rg and horario_entrada and data and empresa:
@@ -124,7 +127,12 @@ def vehicle_access_interface():
             # Campos para editar registro existente
             existing_record = st.session_state.df_acesso_veiculos[st.session_state.df_acesso_veiculos["Nome"] == name_to_add_or_edit].iloc[0]
             
-            rg = st.text_input("RG/CPF:", value=existing_record["RG/CPF"])
+            # Garantir que o RG/CPF seja preenchido mesmo se for nulo
+            rg_cpf_value = existing_record.get("RG/CPF", "")
+            if pd.isna(rg_cpf_value):
+                rg_cpf_value = ""
+            rg = st.text_input("RG/CPF:", value=str(rg_cpf_value))
+            
             placa = st.text_input("Placa do Carro (opcional):", value=existing_record["Placa"])
             marca_carro = st.text_input("Marca do Carro (opcional):", value=existing_record["Marca do Carro"])
             
@@ -146,7 +154,7 @@ def vehicle_access_interface():
             )
             empresa = st.text_input("Empresa:", value=existing_record["Empresa"])
 
-            status_options = ["Autorizado", "Bloqueada"]
+            status_options = ["Autorizado", "Bloqueado"]
             status_value = existing_record["Status da Entrada"]
             if pd.isna(status_value) or status_value not in status_options:
                 status_value = status_options[0]
@@ -156,11 +164,11 @@ def vehicle_access_interface():
                 status_options,
                 index=status_options.index(status_value)
             )
-            motivo = st.text_input("Motivo do Bloqueio", value=existing_record["Motivo do Bloqueio"]) if status == "Bloqueada" else ""
+            motivo = st.text_input("Motivo do Bloqueio", value=existing_record["Motivo do Bloqueio"]) if status == "Bloqueado" else ""
             aprovador = st.text_input("Aprovador", value=existing_record["Aprovador"]) if status == "Autorizado" else ""
 
-            if status == "Bloqueada":
-                st.warning("A liberação só pode ser feita pelo responsável por profissional dá área responsável ou Gestor da UO.")
+            if status == "Bloqueado":
+                st.warning("A liberação só pode ser feita por profissional da área responsável ou Gestor da UO.")
 
             if st.button("Atualizar Registro"):
                 if rg and horario_entrada and data and empresa:
@@ -312,6 +320,11 @@ def blocks():
         st.error("Registros Bloqueados:\n" + blocked_info)
     else:
         st.empty()
+
+
+
+
+
 
 
 
