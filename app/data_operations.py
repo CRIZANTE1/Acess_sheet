@@ -165,7 +165,7 @@ def add_record(name, cpf, placa, marca_carro, horario_entrada, data, empresa, st
         
     return success
 
-def update_exit_time(name, date, new_exit_time):
+def update_exit_time(name, date_saida, new_exit_time):
     sheet_operations = SheetOperations()
     data_from_sheet = sheet_operations.carregar_dados()
     if not data_from_sheet:
@@ -174,12 +174,6 @@ def update_exit_time(name, date, new_exit_time):
 
     columns = data_from_sheet[0]
     df = pd.DataFrame(data_from_sheet[1:], columns=columns)
-
-    # Converter a data de pesquisa para datetime para comparação
-    try:
-        search_date = datetime.strptime(date, "%d/%m/%Y")
-    except ValueError:
-        return False, "Data em formato inválido."
 
     # Encontrar todos os registros da pessoa
     person_records = df[df["Nome"] == name].copy()
@@ -190,27 +184,42 @@ def update_exit_time(name, date, new_exit_time):
     # Converter as datas dos registros para datetime
     person_records['Data_dt'] = pd.to_datetime(person_records['Data'], format='%d/%m/%Y')
     
-    # Filtrar registros sem horário de saída e ordenar por data
+    # Filtrar registros sem horário de saída
     open_records = person_records[
         (person_records['Horário de Saída'].isna()) | 
         (person_records['Horário de Saída'] == '')
-    ].sort_values('Data_dt')
+    ]
 
     if open_records.empty:
         return False, "Não há registros em aberto para esta pessoa."
 
-    # Encontrar o registro mais próximo da data informada
-    closest_record = None
-    min_days_diff = float('inf')
-    
-    for _, record in open_records.iterrows():
-        days_diff = abs((search_date - record['Data_dt']).days)
-        if days_diff < min_days_diff:
-            min_days_diff = days_diff
-            closest_record = record
+    # Converter a data de saída para datetime para comparação
+    try:
+        data_saida_dt = datetime.strptime(date_saida, "%d/%m/%Y")
+    except ValueError:
+        return False, "Data de saída em formato inválido."
 
-    if closest_record is None:
-        return False, "Não foi possível encontrar um registro adequado para atualização."
+    # Se houver apenas um registro em aberto, usar ele
+    if len(open_records) == 1:
+        closest_record = open_records.iloc[0]
+    else:
+        # Se houver múltiplos registros em aberto, encontrar o registro mais recente antes da data de saída
+        open_records = open_records[open_records['Data_dt'] <= data_saida_dt]
+        if open_records.empty:
+            return False, "Não há registros de entrada anteriores à data de saída informada."
+        closest_record = open_records.iloc[-1]  # Pega o registro mais recente
+
+    # Validar se a data de saída não é anterior à data de entrada
+    data_entrada_dt = closest_record['Data_dt']
+    if data_saida_dt < data_entrada_dt:
+        return False, f"A data de saída ({date_saida}) não pode ser anterior à data de entrada ({closest_record['Data']})."
+
+    # Validar horários no caso de mesma data
+    if data_saida_dt == data_entrada_dt:
+        horario_entrada = datetime.strptime(closest_record['Horário de Entrada'], "%H:%M")
+        horario_saida = datetime.strptime(new_exit_time, "%H:%M")
+        if horario_saida < horario_entrada:
+            return False, "O horário de saída não pode ser anterior ao horário de entrada no mesmo dia."
 
     # Atualizar o horário de saída
     record_id = closest_record['ID']
@@ -235,8 +244,7 @@ def update_exit_time(name, date, new_exit_time):
         # Forçar atualização dos dados no cache
         if "df_acesso_veiculos" in st.session_state:
             del st.session_state.df_acesso_veiculos
-        st.success("Horário de saída atualizado com sucesso!")
-        return True, "Atualização realizada com sucesso."
+        return True, f"Saída registrada com sucesso para entrada do dia {closest_record['Data']}."
     else:
         return False, "Erro ao atualizar o horário de saída."
 
@@ -376,10 +384,6 @@ def mouth_consult(): # Consulta por mês as entradas de uma pessoa especifica
                     st.warning(f"Nenhum registro encontrado para {name_to_check_month} no mês de {month_to_check.strftime('%B %Y')}.")
             else:
                 st.warning("Por favor, selecione o nome e o mês para consulta.")
-
-
-
-
 
 
 
