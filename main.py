@@ -37,6 +37,7 @@ def main():
         if user_is_admin:
             page_options.append("Controle de Acesso") # Adicionar Controle de Acesso apenas para admin
             page_options.append("Configurações do Sistema")
+            page_options.append("Resumo")
         else:
             page_options.append("Resumo") # Adicionar opção de resumo para não administradores
             
@@ -45,6 +46,8 @@ def main():
         if page == "Controle de Acesso":
             vehicle_access_interface()
             mouth_consult()
+            summary_page()
+            
         elif page == "Configurações do Sistema":
             if user_is_admin:
                 admin_page()
