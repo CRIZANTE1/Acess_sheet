@@ -199,31 +199,13 @@ def update_exit_time(name, date, new_exit_time):
         return False, "Registro não encontrado para atualização."
 
 
-def delete_record(name, data):
+def delete_record_by_id(record_id):
     sheet_operations = SheetOperations()
-    data_from_sheet = sheet_operations.carregar_dados()
-    if not data_from_sheet:
-        st.error("Não foi possível carregar os dados para exclusão.")
-        return False
-
-    columns = data_from_sheet[0]
-    df = pd.DataFrame(data_from_sheet[1:], columns=columns)
-
-    name_lower = name.lower()
-    df['Nome_lower'] = df['Nome'].str.lower()
-
-    record_to_delete = df[((df['Nome_lower'] == name_lower) & (df['Data'] == data))]
-    
-    if not record_to_delete.empty:
-        record_id = record_to_delete["ID"].iloc[0]
-        success = sheet_operations.excluir_dados(record_id)
-        if success:
-            return True
-        else:
-            st.error("Erro ao excluir registro no Google Sheets.")
-            return False
+    success = sheet_operations.excluir_dados(record_id)
+    if success:
+        return True
     else:
-        st.warning("Registro não encontrado para exclusão.")
+        st.error(f"Erro ao excluir registro com ID {record_id} no Google Sheets.")
         return False
 
 
