@@ -116,6 +116,7 @@ def add_record(name, cpf, placa, marca_carro, horario_entrada, data, empresa, st
     # Verifica se já existe um registro com o mesmo nome e data
     existing_record = df[(df["Nome"] == name) & (df["Data"] == data_formatada)]
 
+    success = False
     if not existing_record.empty:
         # Atualiza o registro existente
         record_id = existing_record["ID"].iloc[0]
@@ -126,8 +127,9 @@ def add_record(name, cpf, placa, marca_carro, horario_entrada, data, empresa, st
             existing_record["Data do Primeiro Registro"]
         ]
         # A API editar_dados precisa do ID para identificar a linha, mas o ID não faz parte dos dados da linha
-        sheet_operations.editar_dados(record_id, updated_data)
-        return True
+        success = sheet_operations.editar_dados(record_id, updated_data)
+        if success:
+            st.success("Registro atualizado com sucesso!")
     else:
         # Adiciona um novo registro
         existing_visitor_records = df[df["Nome"] == name]
@@ -152,7 +154,14 @@ def add_record(name, cpf, placa, marca_carro, horario_entrada, data, empresa, st
             first_registration_date
         ]
         sheet_operations.adc_dados(new_record_list)
-        return True
+        success = True
+        st.success("Novo registro adicionado com sucesso!")
+
+    # Forçar atualização dos dados no cache
+    if success and "df_acesso_veiculos" in st.session_state:
+        del st.session_state.df_acesso_veiculos
+        
+    return success
 
 def update_exit_time(name, date, new_exit_time):
     sheet_operations = SheetOperations()
@@ -199,34 +208,35 @@ def update_exit_time(name, date, new_exit_time):
             closest_record = record
 
     if closest_record is None:
-        return False, "Nenhum registro encontrado próximo à data informada."
+        return False, "Não foi possível encontrar um registro adequado para atualização."
 
-    # Criar uma cópia da linha para modificação
-    record_id = closest_record["ID"]
-    updated_row_df = closest_record.copy()
-    updated_row_df["Horário de Saída"] = new_exit_time
-    
-    # Garantir que a lista de dados corresponda à estrutura da planilha
-    updated_data_list = [
-        updated_row_df["Nome"],
-        updated_row_df["CPF"],
-        updated_row_df["Placa"],
-        updated_row_df["Marca do Carro"],
-        updated_row_df["Horário de Entrada"],
-        updated_row_df["Horário de Saída"], # Novo horário de saída
-        updated_row_df["Data"],
-        updated_row_df["Empresa"],
-        updated_row_df["Status da Entrada"],
-        updated_row_df["Motivo do Bloqueio"],
-        updated_row_df["Aprovador"],
-        updated_row_df["Data do Primeiro Registro"]
+    # Atualizar o horário de saída
+    record_id = closest_record['ID']
+    updated_data = [
+        closest_record['Nome'],
+        closest_record['CPF'],
+        closest_record['Placa'],
+        closest_record['Marca do Carro'],
+        closest_record['Horário de Entrada'],
+        new_exit_time,
+        closest_record['Data'],
+        closest_record['Empresa'],
+        closest_record['Status da Entrada'],
+        closest_record.get('Motivo do Bloqueio', ''),
+        closest_record.get('Aprovador', ''),
+        closest_record.get('Data do Primeiro Registro', closest_record['Data'])
     ]
+
+    success = sheet_operations.editar_dados(record_id, updated_data)
     
-    success = sheet_operations.editar_dados(record_id, updated_data_list)
     if success:
-        return True, f"Horário de saída atualizado com sucesso! (Registro do dia {updated_row_df['Data']})"
+        # Forçar atualização dos dados no cache
+        if "df_acesso_veiculos" in st.session_state:
+            del st.session_state.df_acesso_veiculos
+        st.success("Horário de saída atualizado com sucesso!")
+        return True, "Atualização realizada com sucesso."
     else:
-        return False, "Erro ao atualizar horário de saída no Google Sheets."
+        return False, "Erro ao atualizar o horário de saída."
 
 
 def delete_record(name, data):
@@ -364,6 +374,8 @@ def mouth_consult(): # Consulta por mês as entradas de uma pessoa especifica
                     st.warning(f"Nenhum registro encontrado para {name_to_check_month} no mês de {month_to_check.strftime('%B %Y')}.")
             else:
                 st.warning("Por favor, selecione o nome e o mês para consulta.")
+
+
 
 
 
