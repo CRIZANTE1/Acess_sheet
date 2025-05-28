@@ -59,14 +59,15 @@ def vehicle_access_interface():
     # Recarregar os dados do Google Sheets para garantir que estão atualizados
     sheet_operations = SheetOperations()
     data_from_sheet = sheet_operations.carregar_dados()
+    column_names = [
+        "ID", "Nome", "RG/CPF", "Placa", "Marca do Carro", "Horário de Entrada",
+        "Data", "Empresa", "Status da Entrada", "Motivo do Bloqueio", "Aprovador", "Data do Primeiro Registro", "Horário de Saída"
+    ]
     if data_from_sheet:
-        columns = data_from_sheet[0]
-        st.session_state.df_acesso_veiculos = pd.DataFrame(data_from_sheet[1:], columns=columns)
+        # Assuming the first row of data_from_sheet is headers, skip it and use predefined columns
+        st.session_state.df_acesso_veiculos = pd.DataFrame(data_from_sheet[1:], columns=column_names)
     else:
-        st.session_state.df_acesso_veiculos = pd.DataFrame(columns=[
-            "ID", "Nome", "RG", "Placa", "Marca do Carro", "Horário de Entrada", 
-            "Data", "Empresa", "Status da Entrada", "Motivo do Bloqueio", "Aprovador", "Data do Primeiro Registro", "Horário de Saída"
-        ])
+        st.session_state.df_acesso_veiculos = pd.DataFrame(columns=column_names)
 
     # Adicionar ou editar registro
     with st.expander("Adicionar ou Editar Registro", expanded=True):
@@ -79,7 +80,7 @@ def vehicle_access_interface():
         if name_to_add_or_edit == "Novo Registro":
             # Campos para adicionar novo registro
             name = st.text_input("Nome:")
-            rg = st.text_input("RG:")
+            rg = st.text_input("RG/CPF:")
             placa = st.text_input("Placa do Carro (opcional):")
             marca_carro = st.text_input("Marca do Carro (opcional):")
             data = st.date_input("Data:")
@@ -119,7 +120,7 @@ def vehicle_access_interface():
             # Campos para editar registro existente
             existing_record = st.session_state.df_acesso_veiculos[st.session_state.df_acesso_veiculos["Nome"] == name_to_add_or_edit].iloc[0]
             
-            rg = st.text_input("RG:", value=existing_record["RG"])
+            rg = st.text_input("RG/CPF:", value=existing_record["RG"])
             placa = st.text_input("Placa do Carro (opcional):", value=existing_record["Placa"])
             marca_carro = st.text_input("Marca do Carro (opcional):", value=existing_record["Marca do Carro"])
             data = st.date_input("Data:", value=datetime.strptime(existing_record["Data"], "%d/%m/%Y"))
@@ -288,7 +289,7 @@ def blocks():
         df_current = pd.DataFrame(data_from_sheet[1:], columns=columns)
     else:
         df_current = pd.DataFrame(columns=[
-            "ID", "Nome", "RG", "Placa", "Marca do Carro", "Horário de Entrada", 
+            "ID", "Nome", "RG/CPF", "Placa", "Marca do Carro", "Horário de Entrada", 
             "Data", "Empresa", "Status da Entrada", "Motivo do Bloqueio", "Aprovador", "Data do Primeiro Registro", "Horário de Saída"
         ])
 
