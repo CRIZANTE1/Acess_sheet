@@ -120,6 +120,7 @@ def add_record(name, CPF, placa, marca_carro, horario_entrada, horario_saida, da
         # Atualiza o registro existente
         record_id = existing_record["ID"].iloc[0]
         updated_data = [
+            id(record_id),  # ID do registro existente
             name,
             CPF,
             placa,
@@ -153,9 +154,19 @@ def add_record(name, CPF, placa, marca_carro, horario_entrada, horario_saida, da
                     first_registration_date = data_formatada
 
         new_record_list = [
-            name, CPF, placa, marca_carro, horario_entrada, data_formatada, empresa, 
-            status, motivo if motivo else "", aprovador if aprovador else "", 
-            first_registration_date, "" # Horário de Saída vazio para novo registro
+            "", # Placeholder para ID
+            name,
+            CPF,
+            placa,
+            marca_carro,
+            horario_entrada,
+            "", # Horário de Saída vazio para novo registro
+            data_formatada,
+            empresa,
+            status,
+            motivo if motivo else "",
+            aprovador if aprovador else "",
+            first_registration_date
         ]
         sheet_operations.adc_dados(new_record_list)
         return True
