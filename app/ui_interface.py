@@ -425,7 +425,7 @@ def vehicle_access_interface():
             else:
                 st.warning(f"Não há registros encontrados para o status {status_filter} e empresa {empresa_filter}.")
          
-    st.data_frame(st.session_state.df_acesso_veiculos.fillna(""))
+    df = st.data_frame(st.session_state.df_acesso_veiculos.fillna(""))
     st.session_state.df_acesso_veiculos = df
 
 def blocks():
