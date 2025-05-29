@@ -425,8 +425,8 @@ def vehicle_access_interface():
             else:
                 st.warning(f"Não há registros encontrados para o status {status_filter} e empresa {empresa_filter}.")
          
-    df = st.data_editor(st.session_state.df_acesso_veiculos.fillna(""), num_rows="dynamic")
-    st.session_state.df_acesso_veiculos = df
+    st.table(st.session_state.df_acesso_veiculos.fillna(""))
+    
 
 def blocks():
     sheet_operations = SheetOperations()
