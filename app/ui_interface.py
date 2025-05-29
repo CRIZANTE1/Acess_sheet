@@ -57,25 +57,41 @@ def validate_cpf(cpf):
 
 def round_to_nearest_interval(time_value, interval=1):
     """Arredonda o horário para o intervalo mais próximo"""
-    if pd.isna(time_value) or time_value == "":
-        return "00:00"  # Valor padrão para NaN ou string vazia
-    
-    if isinstance(time_value, (int, float)):
-        hours = int(time_value // 60)
-        minutes = int(time_value % 60)
-        time_str = f"{hours:02d}:{minutes:02d}"
-    else:
-        time_str = str(time_value)
-    
-    # Verificar se o valor está no formato esperado
     try:
-        time = datetime.strptime(time_str, "%H:%M")
-    except ValueError:
-        return "00:00"  # Valor padrão se o formato estiver incorreto
-    
-    minutes = (time.hour * 60 + time.minute) // interval * interval
-    rounded_time = datetime.strptime(f"{minutes // 60:02d}:{minutes % 60:02d}", "%H:%M")
-    return rounded_time.strftime("%H:%M")
+        # Se for string vazia ou None, retorna horário atual
+        if pd.isna(time_value) or time_value == "":
+            now = datetime.now()
+            return now.strftime("%H:%M")
+        
+        # Se for número (minutos desde meia-noite)
+        if isinstance(time_value, (int, float)):
+            hours = int(time_value // 60)
+            minutes = int(time_value % 60)
+            time_str = f"{hours:02d}:{minutes:02d}"
+        else:
+            time_str = str(time_value)
+        
+        # Tenta converter para datetime
+        try:
+            time = datetime.strptime(time_str, "%H:%M")
+        except ValueError:
+            # Se falhar, usa horário atual
+            now = datetime.now()
+            return now.strftime("%H:%M")
+        
+        # Arredonda para o intervalo mais próximo
+        total_minutes = time.hour * 60 + time.minute
+        rounded_minutes = (total_minutes // interval) * interval
+        
+        # Converte de volta para horas e minutos
+        hours = rounded_minutes // 60
+        minutes = rounded_minutes % 60
+        
+        return f"{hours:02d}:{minutes:02d}"
+    except Exception:
+        # Em caso de qualquer erro, retorna horário atual
+        now = datetime.now()
+        return now.strftime("%H:%M")
 
 def vehicle_access_interface():
     st.title("Controle de Acesso BAERI")
