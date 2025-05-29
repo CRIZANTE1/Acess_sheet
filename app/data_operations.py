@@ -1,443 +1,476 @@
+import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
-import streamlit as st
-import time
-import locale
+from app.data_operations import add_record, update_exit_time, delete_record, check_entry, check_blocked_records, get_block_info
 from app.operations import SheetOperations
 
-def show_progress_bar(progress_placeholder):
-    progress_text = "Aguarde o carregamento da página..."
-    with st.spinner(progress_text):
-        for _ in range(100):
-            time.sleep(0.010)
-    
+def generate_time_options():
+    times = []
+    start_time = datetime.strptime("00:00", "%H:%M")
+    end_time = datetime.strptime("23:59", "%H:%M")
 
-def initialize_columns(df):
-    """Certifica-se de que todas as colunas necessárias estão presentes no DataFrame"""
-    required_columns = [
-        "Nome", "CPF", "Placa", "Marca do Carro", "Horário de Entrada", 
-        "Data", "Empresa", "Status da Entrada", "Motivo do Bloqueio", "Aprovador", "Data do Primeiro Registro"
-    ]
-    for column in required_columns:
-        if column not in df.columns:
-            df[column] = ""
-    return df
+    current_time = start_time
+    while current_time <= end_time:
+        times.append(current_time.strftime("%H:%M"))
+        current_time += timedelta(minutes=1)
+    
+    return times
 
-def check_briefing_needed(df, name, current_date):
-    """
-    Verifica se um visitante precisa fazer o briefing baseado em seu histórico completo.
+def format_cpf(cpf):
+    """Formata o CPF no padrão XXX.XXX.XXX-XX"""
+    # Remove caracteres não numéricos
+    cpf = ''.join(filter(str.isdigit, str(cpf)))
+    if len(cpf) != 11:
+        return cpf
+    return f"{cpf[:3]}.{cpf[3:6]}.{cpf[6:9]}-{cpf[9:]}"
+
+def validate_cpf(cpf):
+    """Valida o CPF"""
+    # Remove caracteres não numéricos
+    cpf = ''.join(filter(str.isdigit, str(cpf)))
     
-    Args:
-        df (pd.DataFrame): DataFrame com todos os registros
-        name (str): Nome do visitante
-        current_date (str): Data atual no formato dd/mm/yyyy
+    # Verifica se tem 11 dígitos
+    if len(cpf) != 11:
+        return False
     
-    Returns:
-        tuple: (precisa_briefing, motivo)
-            precisa_briefing: True se precisar fazer briefing
-            motivo: String explicando o motivo
-    """
-    # Pegar todos os registros do visitante
-    visitor_records = df[df["Nome"] == name].copy()
+    # Verifica se todos os dígitos são iguais
+    if len(set(cpf)) == 1:
+        return False
     
-    if visitor_records.empty:
-        return True, "primeiro_acesso"
-        
+    # Validação do primeiro dígito verificador
+    soma = sum(int(cpf[i]) * (10 - i) for i in range(9))
+    resto = (soma * 10) % 11
+    if resto == 10:
+        resto = 0
+    if resto != int(cpf[9]):
+        return False
+    
+    # Validação do segundo dígito verificador
+    soma = sum(int(cpf[i]) * (11 - i) for i in range(10))
+    resto = (soma * 10) % 11
+    if resto == 10:
+        resto = 0
+    if resto != int(cpf[10]):
+        return False
+    
+    return True
+
+def round_to_nearest_interval(time_value, interval=1):
+    """Arredonda o horário para o intervalo mais próximo"""
     try:
-        # Converter a data atual para datetime
-        current_date = datetime.strptime(current_date, "%d/%m/%Y")
+        # Se for string vazia ou None, retorna horário atual
+        if pd.isna(time_value) or time_value == "":
+            now = datetime.now()
+            return now.strftime("%H:%M")
         
-        # Converter todas as datas para datetime
-        visitor_records["Data"] = pd.to_datetime(visitor_records["Data"], format="%d/%m/%Y")
+        # Se for número (minutos desde meia-noite)
+        if isinstance(time_value, (int, float)):
+            hours = int(time_value // 60)
+            minutes = int(time_value % 60)
+            time_str = f"{hours:02d}:{minutes:02d}"
+        else:
+            time_str = str(time_value)
         
-        # Encontrar a data do acesso mais recente
-        last_access = visitor_records["Data"].max()
+        # Tenta converter para datetime
+        try:
+            time = datetime.strptime(time_str, "%H:%M")
+        except ValueError:
+            # Se falhar, usa horário atual
+            now = datetime.now()
+            return now.strftime("%H:%M")
         
-        # Calcular a diferença em dias
-        days_since_last_access = (current_date - last_access).days
+        # Arredonda para o intervalo mais próximo
+        total_minutes = time.hour * 60 + time.minute
+        rounded_minutes = (total_minutes // interval) * interval
         
-        if days_since_last_access >= 365:
-            return True, "mais_de_um_ano"
+        # Converte de volta para horas e minutos
+        hours = rounded_minutes // 60
+        minutes = rounded_minutes % 60
         
-        return False, None
-        
-    except ValueError as e:
-        st.error(f"Erro ao processar datas: {str(e)}")
-        return False, None
+        return f"{hours:02d}:{minutes:02d}"
+    except Exception:
+        # Em caso de qualquer erro, retorna horário atual
+        now = datetime.now()
+        return now.strftime("%H:%M")
 
-def add_record(name, cpf, placa, marca_carro, horario_entrada, data, empresa, status, motivo=None, aprovador=None):
-    sheet_operations = SheetOperations()
+def vehicle_access_interface():
+    st.title("Controle de Acesso BAERI")
     
-    # Carregar dados existentes para verificar e adicionar
+    # BRIEFING DE SEGURANGA
+    with st.expander('Briefing de segurança', expanded=True):
+        st.write("**ATENÇÃO:**\n\n"
+                 "1. O acesso de veículos deve ser controlado rigorosamente para garantir a segurança do local.\n"
+                 "2. Apenas pessoas autorizadas podem liberar o acesso.\n"
+                 "3. Em caso de dúvidas, entre em contato com o responsável pela segurança.\n"
+                 "4. Mantenha sempre os dados atualizados e verifique as informações antes de liberar o acesso."
+                 "\n5. Sempre que for a primeira vez do visitante ou um ano do acesso repassar o video.\n")
+        try: # Adicionar vídeo
+            st.video("https://youtu.be/QqUkeTucwkI")
+        except Exception as e:
+            st.error(f"Erro ao carregar o vídeo: {e}")
+
+    blocks()
+    
+    # Recarregar os dados do Google Sheets para garantir que estão atualizados
+    sheet_operations = SheetOperations()
     data_from_sheet = sheet_operations.carregar_dados()
     if data_from_sheet:
-        # A primeira linha são os cabeçalhos
+        # Use the actual headers from the sheet
         columns = data_from_sheet[0]
-        df = pd.DataFrame(data_from_sheet[1:], columns=columns)
+        df_temp = pd.DataFrame(data_from_sheet[1:], columns=columns)
+        
+        # Garantir que valores nulos ou vazios sejam tratados corretamente
+        df_temp = df_temp.fillna("")
+        st.session_state.df_acesso_veiculos = df_temp
     else:
-        df = pd.DataFrame(columns=[
+        st.session_state.df_acesso_veiculos = pd.DataFrame(columns=[
+            "Nome", "CPF", "Placa", "Marca do Carro", "Horário de Entrada",
+            "Horário de Saída", "Data", "Empresa", "Status da Entrada", "Motivo do Bloqueio", "Aprovador", "Data do Primeiro Registro"
+        ])
+
+    # Adicionar ou editar registro
+    with st.expander("Adicionar ou Editar Registro", expanded=True):
+        unique_names = st.session_state.df_acesso_veiculos["Nome"].unique()
+        name_to_add_or_edit = st.selectbox("Selecionar Nome para Adicionar ou Editar:", options=["Novo Registro"] + list(unique_names))
+        
+        horario_options = generate_time_options()
+
+        if name_to_add_or_edit == "Novo Registro":
+            # Campos para adicionar novo registro
+            name = st.text_input("Nome:")
+            cpf = st.text_input("CPF:")
+            
+            # Validação do CPF
+            if cpf:
+                if not validate_cpf(cpf):
+                    st.error("CPF inválido! Por favor, insira um CPF válido.")
+                else:
+                    cpf = format_cpf(cpf)
+            
+            # Adicionar checkbox para controle de veículo
+            com_veiculo = st.checkbox("Entrada com veículo")
+            
+            # Campos de veículo só aparecem se a checkbox estiver marcada
+            if com_veiculo:
+                placa = st.text_input("Placa do Carro:")
+                marca_carro = st.text_input("Marca do Carro:")
+            else:
+                placa = ""
+                marca_carro = ""
+            
+            data = st.date_input("Data:")
+            horario_entrada = st.selectbox("Horário de Entrada:", options=[""] + horario_options)
+            empresa = st.text_input("Empresa:")
+            status = st.selectbox("Status de Entrada", ["Autorizado", "Bloqueado"], index=0)
+            motivo = st.text_input("Motivo do Bloqueio") if status == "Bloqueado" else ""
+            aprovador = st.text_input("Aprovador") if status == "Autorizado" else ""
+
+            if status == "Bloqueado":
+                st.warning("A liberação só pode ser feita por profissional da área responsável ou Gestor da UO.")
+
+            if st.button("Adicionar Registro"):
+                if name and cpf and validate_cpf(cpf) and horario_entrada and data and empresa:
+                    data_obj = datetime.strptime(data.strftime("%Y-%m-%d"), "%Y-%m-%d")
+                    data_formatada = data_obj.strftime("%d/%m/%Y")
+
+                    success = add_record(
+                        name, cpf, placa, marca_carro, 
+                        horario_entrada, 
+                        data_formatada,
+                        empresa, 
+                        status, 
+                        motivo, 
+                        aprovador
+                    )
+                    if success:
+                        st.success("Registro adicionado com sucesso!")
+                        # Recarregar dados após a adição
+                        st.session_state.df_acesso_veiculos = pd.DataFrame(sheet_operations.carregar_dados()[1:], columns=sheet_operations.carregar_dados()[0])
+                        st.rerun()
+                    else:
+                        st.error("Falha ao adicionar registro.")
+                else:
+                    st.warning("Por favor, preencha todos os campos obrigatórios com dados válidos: Nome, CPF, Horário de Entrada, Data e Empresa.")
+        else:
+            # Mostrar informações atuais do registro
+            existing_record = st.session_state.df_acesso_veiculos[st.session_state.df_acesso_veiculos["Nome"] == name_to_add_or_edit].iloc[0]
+            
+            # Mostrar informações atuais do registro
+            st.info(f"""
+            Informações atuais do registro:
+            - Horário de Entrada: {existing_record['Horário de Entrada']}
+            - Horário de Saída: {existing_record['Horário de Saída'] if existing_record['Horário de Saída'] else 'Não registrado'}
+            - Data: {existing_record['Data']}
+            """)
+            
+            # Tratamento especial para o campo CPF para preservar números longos
+            cpf_value = ""
+            if "CPF" in existing_record:
+                cpf_value = str(existing_record["CPF"])
+            
+            # Garantir que o valor seja uma string e remover formatação científica
+            if pd.isna(cpf_value) or cpf_value is None or cpf_value == "nan":
+                cpf_value = ""
+            else:
+                try:
+                    # Remove formatação existente e aplica nova formatação
+                    cpf_value = ''.join(filter(str.isdigit, str(cpf_value)))
+                    if len(cpf_value) == 11:
+                        cpf_value = format_cpf(cpf_value)
+                except (ValueError, TypeError):
+                    cpf_value = str(cpf_value).strip()
+            
+            cpf = st.text_input("CPF:", value=cpf_value)
+            
+            # Validação do CPF
+            if cpf:
+                if not validate_cpf(cpf):
+                    st.error("CPF inválido! Por favor, insira um CPF válido.")
+                else:
+                    cpf = format_cpf(cpf)
+            
+            # Adicionar checkbox para controle de veículo
+            tem_veiculo = existing_record["Placa"] != "" or existing_record["Marca do Carro"] != ""
+            com_veiculo = st.checkbox("Entrada com veículo", value=tem_veiculo)
+            
+            # Campos de veículo só aparecem se a checkbox estiver marcada
+            if com_veiculo:
+                placa = st.text_input("Placa do Carro:", value=existing_record["Placa"])
+                marca_carro = st.text_input("Marca do Carro:", value=existing_record["Marca do Carro"])
+            else:
+                placa = ""
+                marca_carro = ""
+            
+            # Tratar a data para evitar ValueError
+            try:
+                data_value = datetime.strptime(existing_record["Data"], "%d/%m/%Y")
+            except (ValueError, TypeError):
+                data_value = datetime.now().date() # Valor padrão se a data for inválida ou vazia
+            data = st.date_input("Data:", value=data_value)
+            
+            horario_entrada_value = existing_record["Horário de Entrada"]
+            rounded_horario = round_to_nearest_interval(str(horario_entrada_value) if horario_entrada_value is not None else "")
+            horario_entrada_index = horario_options.index(rounded_horario) if rounded_horario in horario_options else 0
+
+            horario_entrada = st.selectbox(
+                "Horário de Entrada:",
+                options=[""] + horario_options,
+                index=horario_entrada_index
+            )
+            empresa = st.text_input("Empresa:", value=existing_record["Empresa"])
+
+            status_options = ["Autorizado", "Bloqueado"]
+            status_value = existing_record["Status da Entrada"]
+            if pd.isna(status_value) or status_value not in status_options:
+                status_value = status_options[0]
+
+            status = st.selectbox(
+                "Status de Entrada",
+                status_options,
+                index=status_options.index(status_value)
+            )
+            motivo = st.text_input("Motivo do Bloqueio", value=existing_record["Motivo do Bloqueio"]) if status == "Bloqueado" else ""
+            aprovador = st.text_input("Aprovador", value=existing_record["Aprovador"]) if status == "Autorizado" else ""
+
+            if status == "Bloqueado":
+                st.warning("A liberação só pode ser feita por profissional da área responsável ou Gestor da UO.")
+
+            if st.button("Atualizar Registro"):
+                if cpf and validate_cpf(cpf) and horario_entrada and data and empresa:
+                    data_obj = datetime.strptime(data.strftime("%Y-%m-%d"), "%Y-%m-%d")
+                    data_formatada = data_obj.strftime("%d/%m/%Y")
+
+                    success = add_record(
+                        name_to_add_or_edit, 
+                        cpf, 
+                        placa, 
+                        marca_carro, 
+                        horario_entrada, 
+                        data_formatada,
+                        empresa, 
+                        status, 
+                        motivo, 
+                        aprovador
+                    )
+                    if success:
+                        st.success("Registro atualizado com sucesso!")
+                        # Recarregar dados após a atualização
+                        st.session_state.df_acesso_veiculos = pd.DataFrame(sheet_operations.carregar_dados()[1:], columns=sheet_operations.carregar_dados()[0])
+                        st.rerun()
+                    else:
+                        st.error("Falha ao atualizar registro.")
+                else:
+                    st.warning("Por favor, preencha todos os campos obrigatórios com dados válidos: CPF, Horário de Entrada, Data e Empresa.")
+            
+    # Atualizar horário de saída
+    with st.expander("Atualizar Horário de Saída", expanded=False):
+        unique_names = st.session_state.df_acesso_veiculos["Nome"].unique()
+        name_to_update = st.selectbox("Nome do registro para atualizar horário de saída:", options=unique_names)
+
+        if name_to_update:
+            # Mostrar registros em aberto para a pessoa selecionada
+            person_records = st.session_state.df_acesso_veiculos[
+                (st.session_state.df_acesso_veiculos["Nome"] == name_to_update) &
+                ((st.session_state.df_acesso_veiculos["Horário de Saída"].isna()) | 
+                 (st.session_state.df_acesso_veiculos["Horário de Saída"] == ""))
+            ]
+
+            if not person_records.empty:
+                st.write("Registros em aberto para esta pessoa:")
+                for _, record in person_records.iterrows():
+                    st.info(f"""
+                    Data de Entrada: {record['Data']}
+                    Horário de Entrada: {record['Horário de Entrada']}
+                    Empresa: {record['Empresa']}
+                    Placa: {record['Placa'] if record['Placa'] else 'Não informada'}
+                    """)
+                
+                st.info("""
+                **Como registrar a saída:**
+                1. Se a pessoa saiu no mesmo dia da entrada, selecione a mesma data e o horário de saída
+                2. Se a pessoa saiu em um dia diferente (ex: entrou ontem e saiu hoje):
+                   - Selecione a data atual da saída
+                   - O sistema irá:
+                     * Fechar o registro do dia anterior às 23:59
+                     * Criar novos registros para os dias intermediários (00:00 às 23:59)
+                     * Registrar a saída final no último dia com o horário informado
+                """)
+            else:
+                st.warning("Não há registros em aberto para esta pessoa.")
+
+        data_to_update = st.date_input("Data da Saída:", key="data_saida", value=datetime.now())
+        horario_saida_options = generate_time_options()
+        horario_saida = st.selectbox("Horário de Saída:", options=[""] + horario_saida_options, key="horario_saida")
+
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("Atualizar Horário de Saída"):
+                if name_to_update and horario_saida and data_to_update:
+                    data_to_update = datetime.strptime(data_to_update.strftime("%Y-%m-%d"), "%Y-%m-%d")
+                    success, message = update_exit_time(
+                        name_to_update, 
+                        data_to_update.strftime("%d/%m/%Y"), 
+                        horario_saida
+                    )
+                    if success:
+                        st.success(message)
+                        # Recarregar dados após a atualização
+                        st.session_state.df_acesso_veiculos = pd.DataFrame(sheet_operations.carregar_dados()[1:], columns=sheet_operations.carregar_dados()[0])
+                        st.rerun()
+                    else:
+                        st.error(message)
+                else:
+                    st.warning("Por favor, selecione o nome, a data e o novo horário de saída.")
+                
+    # Deletar registro
+    with st.expander("Deletar Registro", expanded=False):
+        unique_names = st.session_state.df_acesso_veiculos["Nome"].unique()
+        name_to_delete = st.selectbox("Nome do registro a ser deletado:", options=unique_names)
+        data_to_delete = st.date_input("Data do registro a ser deletado:", key="data_delete")
+
+        if st.button("Deletar Registro"):
+            if name_to_delete and data_to_delete:
+                data_to_delete = datetime.strptime(data_to_delete.strftime("%Y-%m-%d"), "%Y-%m-%d")
+                success = delete_record(
+                    name_to_delete, 
+                    data_to_delete.strftime("%d/%m/%Y")
+                )
+                if success:
+                    st.success("Registro deletado com sucesso!")
+                    # Recarregar dados após a exclusão
+                    st.session_state.df_acesso_veiculos = pd.DataFrame(sheet_operations.carregar_dados()[1:], columns=sheet_operations.carregar_dados()[0])
+                    st.rerun()
+                else:
+                    st.error("Falha ao deletar registro.")
+            else:
+                st.warning("Por favor, selecione o nome e a data do registro a ser deletado.")
+    
+    # Consultar por Nome
+    with st.expander("Consultar Registro por Nome", expanded=False):
+        unique_names = st.session_state.df_acesso_veiculos["Nome"].unique()
+        name_to_check = st.selectbox("Nome para consulta:", options=unique_names)
+
+        if st.button("Verificar Registro"):
+            if name_to_check:
+                person, status = check_entry(name_to_check, None)
+                if person is not None:
+                    st.write(f"Nome: {person['Nome']}")
+                    st.write(f"CPF: {person['CPF']}")
+                    st.write(f"Placa: {person['Placa']}")
+                    st.write(f"Marca do Carro: {person['Marca do Carro']}")
+                    st.write(f"Horário de Entrada: {person['Horário de Entrada']}")
+                    st.write(f"Horário de Saída: {person['Horário de Saída']}")
+                    st.write(f"Empresa: {person['Empresa']}")
+                    st.write(f"Status de Entrada: {person['Status da Entrada']}")
+
+                    if person['Status da Entrada'] == 'Bloqueada':
+                        st.write(f"Motivo do Bloqueio: {person['Motivo do Bloqueio']}")
+                        st.write(f"Aprovador do Bloqueio: {person['Aprovador']}")
+                    else:
+                        st.write(f"Aprovador da Entrada: {person['Aprovador']}")
+                else:
+                    st.warning(status)
+            else:
+                st.warning("Por favor, insira o nome.")
+    
+    # Consulta Geral de Pessoas Autorizadas e Bloqueadas
+    with st.expander("Consulta Geral de Pessoas Autorizadas e Bloqueadas", expanded=False):
+        status_filter = st.selectbox("Selecione o Status para Consulta:", ["Todos", "Autorizada", "Bloqueada"])
+        empresa_filter = st.selectbox("Selecione a Empresa para Consulta:", ["Todas"] + list(st.session_state.df_acesso_veiculos["Empresa"].unique()))
+
+        if st.button("Consultar"):
+            if status_filter == "Todos":
+                df_filtered = st.session_state.df_acesso_veiculos
+            else:
+                df_filtered = st.session_state.df_acesso_veiculos[st.session_state.df_acesso_veiculos["Status da Entrada"] == status_filter]
+            
+            if empresa_filter != "Todas":
+                df_filtered = df_filtered[df_filtered["Empresa"] == empresa_filter]
+            
+            columns_to_display = ["Nome", "CPF", "Placa", "Marca do Carro", "Empresa", "Status da Entrada", "Motivo do Bloqueio", "Aprovador"]
+            df_filtered = df_filtered[columns_to_display]
+            
+            if not df_filtered.empty:
+                st.write(f"Registros de Pessoas {status_filter}as na empresa {empresa_filter}:")
+                st.dataframe(df_filtered)
+            else:
+                st.warning(f"Não há registros encontrados para o status {status_filter} e empresa {empresa_filter}.")
+         
+    st.dataframe(st.session_state.df_acesso_veiculos.fillna(""))
+    
+
+def blocks():
+    sheet_operations = SheetOperations()
+    data_from_sheet = sheet_operations.carregar_dados()
+    if data_from_sheet:
+        columns = data_from_sheet[0]
+        df_current = pd.DataFrame(data_from_sheet[1:], columns=columns)
+    else:
+        df_current = pd.DataFrame(columns=[
             "Nome", "CPF", "Placa", "Marca do Carro", "Horário de Entrada", 
             "Horário de Saída", "Data", "Empresa", "Status da Entrada", "Motivo do Bloqueio", "Aprovador", "Data do Primeiro Registro"
         ])
+
+    blocked_info = check_blocked_records(df_current)
     
-    df = initialize_columns(df)  # Certifique-se de que todas as colunas necessárias estão presentes
-    
-    # Função auxiliar para formatar data
-    def format_date(date_str):
-        try:
-            # Tenta primeiro o formato dd/mm/yyyy
-            return datetime.strptime(date_str, "%d/%m/%Y").strftime("%d/%m/%Y")
-        except ValueError:
-            try:
-                # Tenta o formato yyyy-mm-dd
-                return datetime.strptime(date_str, "%Y-%m-%d").strftime("%d/%m/%Y")
-            except ValueError:
-                try:
-                    # Tenta converter de timestamp se for um objeto datetime
-                    return date_str.strftime("%d/%m/%Y")
-                except AttributeError:
-                    return None
-
-    # Formatar a data do novo registro
-    data_formatada = format_date(data)
-    if not data_formatada:
-        st.error(f"Erro: Data '{data}' está em um formato inválido.")
-        return False
-
-    # Verificar necessidade de briefing
-    needs_briefing, motivo_briefing = check_briefing_needed(df, name, data_formatada)
-    if needs_briefing:
-        mensagem = "ATENÇÃO! {} precisa fazer o briefing de segurança pois {}.".format(
-            name,
-            "é seu primeiro acesso" if motivo_briefing == "primeiro_acesso" else "já se passou mais de 1 ano desde seu último acesso"
-        )
-        st.warning(mensagem)
-
-    # Verifica se já existe um registro com o mesmo nome e data
-    existing_record = df[(df["Nome"] == name) & (df["Data"] == data_formatada)]
-
-    success = False
-    if not existing_record.empty:
-        # Atualiza o registro existente
-        record_id = existing_record["ID"].iloc[0]
-        horario_saida = existing_record["Horário de Saída"].iloc[0] if "Horário de Saída" in existing_record else ""
-        updated_data = [
-            name, cpf, placa, marca_carro, horario_entrada, 
-            horario_saida,  # Mantém o horário de saída existente
-            data_formatada, empresa, 
-            status, motivo if motivo else "", aprovador if aprovador else "", 
-            existing_record["Data do Primeiro Registro"].iloc[0]
-        ]
-        # A API editar_dados precisa do ID para identificar a linha, mas o ID não faz parte dos dados da linha
-        success = sheet_operations.editar_dados(record_id, updated_data)
-        if success:
-            st.success("Registro atualizado com sucesso!")
+    if blocked_info:
+        st.error("Registros Bloqueados:\n" + blocked_info)
     else:
-        # Adiciona um novo registro
-        existing_visitor_records = df[df["Nome"] == name]
-
-        if existing_visitor_records.empty:
-            first_registration_date = data_formatada
-        else:
-            existing_dates = existing_visitor_records["Data"].dropna()
-            if existing_dates.empty:
-                first_registration_date = data_formatada
-            else:
-                try:
-                    dates = pd.to_datetime(existing_dates, format="%d/%m/%Y")
-                    first_registration_date = min(dates).strftime("%d/%m/%Y")
-                except ValueError:
-                    first_registration_date = data_formatada
-
-        new_record_list = [
-            name, cpf, placa, marca_carro, horario_entrada, "", # Horário de Saída vazio para novo registro
-            data_formatada, empresa,
-            status, motivo if motivo else "", aprovador if aprovador else "",
-            first_registration_date
-        ]
-        sheet_operations.adc_dados(new_record_list)
-        success = True
-        st.success("Novo registro adicionado com sucesso!")
-
-    # Forçar atualização dos dados no cache
-    if success and "df_acesso_veiculos" in st.session_state:
-        del st.session_state.df_acesso_veiculos
-        
-    return success
-
-def update_exit_time(name, date_saida, new_exit_time):
-    sheet_operations = SheetOperations()
-    data_from_sheet = sheet_operations.carregar_dados()
-    if not data_from_sheet:
-        return False, "Não foi possível carregar os dados para atualização."
-
-    columns = data_from_sheet[0]
-    df = pd.DataFrame(data_from_sheet[1:], columns=columns)
-
-    # Encontrar todos os registros da pessoa
-    person_records = df[df["Nome"] == name].copy()
-    
-    if person_records.empty:
-        return False, "Nenhum registro encontrado para esta pessoa."
-
-    try:
-        # Converter as datas dos registros para datetime
-        person_records['Data_dt'] = pd.to_datetime(person_records['Data'], format='%d/%m/%Y')
-        
-        # Filtrar registros sem horário de saída
-        open_records = person_records[
-            (person_records['Horário de Saída'].isna()) | 
-            (person_records['Horário de Saída'] == '')
-        ]
-
-        if open_records.empty:
-            return False, "Não há registros em aberto para esta pessoa."
-
-        # Converter a data de saída para datetime para comparação
-        try:
-            data_saida_dt = datetime.strptime(date_saida, "%d/%m/%Y")
-        except ValueError:
-            return False, "Data de saída em formato inválido."
-
-        # Se houver apenas um registro em aberto, usar ele
-        if len(open_records) == 1:
-            closest_record = open_records.iloc[0]
-        else:
-            # Se houver múltiplos registros em aberto, encontrar o registro mais recente antes da data de saída
-            open_records = open_records[open_records['Data_dt'] <= data_saida_dt]
-            if open_records.empty:
-                return False, "Não há registros de entrada anteriores à data de saída informada."
-            closest_record = open_records.iloc[-1]  # Pega o registro mais recente
-
-        # Validar se a data de saída não é anterior à data de entrada
-        data_entrada_dt = closest_record['Data_dt']
-        if data_saida_dt < data_entrada_dt:
-            return False, f"A data de saída ({date_saida}) não pode ser anterior à data de entrada ({closest_record['Data']})."
-
-        # Se a saída for no mesmo dia da entrada, validar horários
-        if data_saida_dt.date() == data_entrada_dt.date():
-            try:
-                horario_entrada = datetime.strptime(closest_record['Horário de Entrada'], "%H:%M")
-                horario_saida = datetime.strptime(new_exit_time, "%H:%M")
-                
-                # Criar objetos datetime completos para comparação
-                entrada_dt = datetime.combine(data_entrada_dt.date(), horario_entrada.time())
-                saida_dt = datetime.combine(data_saida_dt.date(), horario_saida.time())
-                
-                if saida_dt < entrada_dt:
-                    return False, "O horário de saída não pode ser anterior ao horário de entrada no mesmo dia."
-            except ValueError as e:
-                return False, f"Erro ao processar horários: {str(e)}"
-            
-            # Atualizar o horário de saída
-            record_id = closest_record['ID']
-            updated_data = [
-                closest_record['Nome'],
-                closest_record['CPF'],
-                closest_record['Placa'],
-                closest_record['Marca do Carro'],
-                closest_record['Horário de Entrada'],
-                new_exit_time,
-                closest_record['Data'],
-                closest_record['Empresa'],
-                closest_record['Status da Entrada'],
-                closest_record.get('Motivo do Bloqueio', ''),
-                closest_record.get('Aprovador', ''),
-                closest_record.get('Data do Primeiro Registro', closest_record['Data'])
-            ]
-            
-            success = sheet_operations.editar_dados(record_id, updated_data)
-        else:
-            # Se a saída for em dia diferente:
-            # 1. Fecha o registro original com saída às 23:59
-            record_id = closest_record['ID']
-            updated_data = [
-                closest_record['Nome'],
-                closest_record['CPF'],
-                closest_record['Placa'],
-                closest_record['Marca do Carro'],
-                closest_record['Horário de Entrada'],
-                "23:59",
-                closest_record['Data'],
-                closest_record['Empresa'],
-                closest_record['Status da Entrada'],
-                closest_record.get('Motivo do Bloqueio', ''),
-                closest_record.get('Aprovador', ''),
-                closest_record.get('Data do Primeiro Registro', closest_record['Data'])
-            ]
-            
-            success1 = sheet_operations.editar_dados(record_id, updated_data)
-            
-            # 2. Cria registros intermediários para os dias entre entrada e saída
-            current_date = data_entrada_dt + timedelta(days=1)
-            while current_date.date() <= data_saida_dt.date():
-                # Se for o último dia (dia da saída), usa o horário de saída informado
-                horario_saida = new_exit_time if current_date.date() == data_saida_dt.date() else "23:59"
-                
-                new_record = [
-                    closest_record['Nome'],
-                    closest_record['CPF'],
-                    closest_record['Placa'],
-                    closest_record['Marca do Carro'],
-                    "00:00",
-                    horario_saida,
-                    current_date.strftime("%d/%m/%Y"),
-                    closest_record['Empresa'],
-                    closest_record['Status da Entrada'],
-                    closest_record.get('Motivo do Bloqueio', ''),
-                    closest_record.get('Aprovador', ''),
-                    closest_record.get('Data do Primeiro Registro', closest_record['Data'])
-                ]
-                
-                sheet_operations.adc_dados(new_record)
-                current_date += timedelta(days=1)
-                
-            success = success1
-
-        if success:
-            return True, f"Registros de saída atualizados com sucesso para o período de {closest_record['Data']} até {date_saida}."
-        else:
-            return False, "Erro ao atualizar os registros de saída."
-            
-    except Exception as e:
-        return False, f"Erro ao processar atualização: {str(e)}"
+        st.empty()
 
 
-def delete_record(name, data):
-    sheet_operations = SheetOperations()
-    data_from_sheet = sheet_operations.carregar_dados()
-    if not data_from_sheet:
-        st.error("Não foi possível carregar os dados para exclusão.")
-        return False
-
-    columns = data_from_sheet[0]
-    df = pd.DataFrame(data_from_sheet[1:], columns=columns)
-
-    name_lower = name.lower()
-    df['Nome_lower'] = df['Nome'].str.lower()
-
-    record_to_delete = df[((df['Nome_lower'] == name_lower) & (df['Data'] == data))]
-    
-    if not record_to_delete.empty:
-        record_id = record_to_delete["ID"].iloc[0]
-        success = sheet_operations.excluir_dados(record_id)
-        if success:
-            return True
-        else:
-            st.error("Erro ao excluir registro no Google Sheets.")
-            return False
-    else:
-        st.warning("Registro não encontrado para exclusão.")
-        return False
 
 
-def check_entry(name, data):
-    sheet_operations = SheetOperations()
-    data_from_sheet = sheet_operations.carregar_dados()
-    if not data_from_sheet:
-        return None, "Não foi possível carregar os dados para verificação."
-
-    columns = data_from_sheet[0]
-    df = pd.DataFrame(data_from_sheet[1:], columns=columns)
-
-    name_lower = name.lower()
-    df['Nome_lower'] = df['Nome'].str.lower()
-
-    if data:
-        person = df[(df['Nome_lower'] == name_lower) & (df['Data'] == data)]
-    else:
-        person = df[df['Nome_lower'] == name_lower]
-    
-    if not person.empty:
-        return person.iloc[0], "Registro encontrado."
-    else:
-        return None, "Nome e/ou data não encontrados."
 
 
-    
-
-def check_blocked_records(df):
-    """
-    Verifica se há registros Bloqueadas e aplica a lógica de liberação recente.
-    """
-    # Filtra os registros Bloqueadas
-    blocked_records = df[df['Status da Entrada'] == 'Bloqueado']
-
-    # Obtém a data mais recente de liberação para cada nome
-    recent_release_dates = df[df['Status da Entrada'] == 'Autorizado'].groupby('Nome')['Data'].max()
-
-    def should_show_block(record):
-        name = record['Nome']
-        block_date = datetime.strptime(record['Data'], '%d/%m/%Y')
-        recent_release_date = recent_release_dates.get(name)
-        
-        if recent_release_date:
-            recent_release_date = datetime.strptime(recent_release_date, '%d/%m/%Y')
-            return block_date > recent_release_date
-        return True
-
-    # Gera a informação de bloqueios que devem ser mostrados
-    blocked_info = "\n".join([
-        f"Nome: {row['Nome']}, Data: {row['Data']}, Placa: {row['Placa']}, Motivo: {row['Motivo do Bloqueio']}"
-        for _, row in blocked_records.iterrows()
-        if should_show_block(row)
-    ])
-
-    return blocked_info if blocked_info else None
 
 
-def get_block_info(df, name):
-    """
-    Obtém o número de bloqueios e os motivos de bloqueio para uma pessoa específica.
-
-    Args:
-        df (pd.DataFrame): DataFrame contendo os dados dos registros.
-        name (str): Nome da pessoa para consultar.
-
-    Returns:
-        tuple: Contém o número de bloqueios e uma lista de motivos.
-    """
-    person_records = df[df["Nome"] == name]
-    blocked_records = person_records[person_records["Status da Entrada"] == "Bloqueado"]
-    num_blocks = len(blocked_records)
-    reasons = blocked_records["Motivo do Bloqueio"].dropna().unique()
-    
-    return num_blocks, reasons
 
 
-#-------------------------------------- Fase de teste ---------------------
 
 
-def mouth_consult(): # Consulta por mês as entradas de uma pessoa especifica
-    with st.expander("Consultar Registro por Nome e Mês", expanded=False):
-        unique_names = st.session_state.df_acesso_veiculos["Nome"].unique()
-        name_to_check_month = st.selectbox("Nome para consulta por mês:", options=unique_names)
-        month_to_check = st.date_input("Mês e ano para consulta:", value=datetime.now())
 
-        if st.button("Verificar Registros do Mês"):
-            if name_to_check_month and month_to_check:
-                start_date = pd.Timestamp(month_to_check.replace(day=1))
-                end_date = (start_date + pd.DateOffset(months=1)) - pd.DateOffset(days=1)
-                
-                mask = (
-                    (st.session_state.df_acesso_veiculos["Nome"] == name_to_check_month) &
-                    (pd.to_datetime(st.session_state.df_acesso_veiculos["Data"], format="%d/%m/%Y") >= start_date) &
-                    (pd.to_datetime(st.session_state.df_acesso_veiculos["Data"], format="%d/%m/%Y") <= end_date)
-                )
-                filtered_df = st.session_state.df_acesso_veiculos[mask]
-                
-                if not filtered_df.empty:
-                    # Set the locale for time formatting
-                    try:
-                        locale.setlocale(locale.LC_TIME, '') # Use default system locale
-                    except locale.Error:
-                        st.warning("Could not set locale for time formatting. Using default.")
-                    st.write(f"Registros de {name_to_check_month} para o mês de {month_to_check.strftime('%B %Y')}:")
-                    st.dataframe(filtered_df.drop(columns=["CPF"], errors='ignore'))
-                else:
-                    st.warning(f"Nenhum registro encontrado para {name_to_check_month} no mês de {month_to_check.strftime('%B %Y')}.")
-            else:
-                st.warning("Por favor, selecione o nome e o mês para consulta.")
+
 
 
 
