@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
-from app.data_operations import add_record, update_exit_time, delete_record, check_entry, check_blocked_records, get_block_info
 from app.operations import SheetOperations
 
 def generate_time_options():
@@ -458,8 +457,205 @@ def blocks():
     else:
         st.empty()
 
+def update_exit_time(name, exit_date, exit_time):
+    """
+    Atualiza o horário de saída de um registro, lidando corretamente com registros que atravessam a meia-noite.
+    
+    Args:
+        name (str): Nome da pessoa
+        exit_date (str): Data da saída no formato dd/mm/yyyy
+        exit_time (str): Horário da saída no formato HH:MM
+    
+    Returns:
+        tuple: (bool, str) indicando sucesso/falha e mensagem
+    """
+    try:
+        sheet_operations = SheetOperations()
+        df = pd.DataFrame(sheet_operations.carregar_dados()[1:], columns=sheet_operations.carregar_dados()[0])
+        
+        # Encontrar o registro em aberto mais recente para a pessoa
+        person_records = df[
+            (df["Nome"] == name) &
+            ((df["Horário de Saída"].isna()) | (df["Horário de Saída"] == ""))
+        ]
+        
+        if person_records.empty:
+            return False, "Nenhum registro em aberto encontrado para esta pessoa."
+        
+        # Pegar o registro mais recente (assumindo que a data está no formato dd/mm/yyyy)
+        record = person_records.iloc[0]
+        record_id = record[0]  # ID do registro
+        
+        # Converter datas e horários para datetime
+        entry_date = datetime.strptime(record["Data"], "%d/%m/%Y")
+        entry_time = datetime.strptime(record["Horário de Entrada"], "%H:%M")
+        exit_date_obj = datetime.strptime(exit_date, "%d/%m/%Y")
+        exit_time_obj = datetime.strptime(exit_time, "%H:%M")
+        
+        # Combinar data e hora
+        entry_datetime = datetime.combine(entry_date.date(), entry_time.time())
+        exit_datetime = datetime.combine(exit_date_obj.date(), exit_time_obj.time())
+        
+        # Se a saída é no mesmo dia da entrada
+        if entry_date.date() == exit_date_obj.date():
+            # Atualizar o registro com o horário de saída
+            updated_data = list(record[1:])  # Excluir o ID
+            updated_data[5] = exit_time  # Índice 5 é o Horário de Saída
+            sheet_operations.editar_dados(record_id, updated_data)
+            return True, "Horário de saída atualizado com sucesso."
+        
+        # Se a saída é em um dia diferente
+        else:
+            # 1. Fechar o registro do dia anterior às 23:59
+            updated_data = list(record[1:])
+            updated_data[5] = "23:59"  # Horário de Saída
+            sheet_operations.editar_dados(record_id, updated_data)
+            
+            # 2. Criar registros para os dias intermediários (se houver)
+            current_date = entry_date + timedelta(days=1)
+            while current_date.date() < exit_date_obj.date():
+                new_data = [
+                    record["Nome"],
+                    record["CPF"],
+                    record["Placa"],
+                    record["Marca do Carro"],
+                    "00:00",  # Horário de Entrada
+                    "23:59",  # Horário de Saída
+                    current_date.strftime("%d/%m/%Y"),
+                    record["Empresa"],
+                    record["Status da Entrada"],
+                    record["Motivo do Bloqueio"],
+                    record["Aprovador"],
+                    record["Data do Primeiro Registro"] if "Data do Primeiro Registro" in record else ""
+                ]
+                sheet_operations.adc_dados(new_data)
+                current_date += timedelta(days=1)
+            
+            # 3. Criar registro final com a saída no horário informado
+            final_data = [
+                record["Nome"],
+                record["CPF"],
+                record["Placa"],
+                record["Marca do Carro"],
+                "00:00",  # Horário de Entrada
+                exit_time,  # Horário de Saída
+                exit_date,
+                record["Empresa"],
+                record["Status da Entrada"],
+                record["Motivo do Bloqueio"],
+                record["Aprovador"],
+                record["Data do Primeiro Registro"] if "Data do Primeiro Registro" in record else ""
+            ]
+            sheet_operations.adc_dados(final_data)
+            
+            return True, "Registros atualizados com sucesso para todo o período."
+            
+    except Exception as e:
+        return False, f"Erro ao atualizar horário de saída: {str(e)}"
 
+def add_record(name, cpf, placa, marca_carro, horario_entrada, data, empresa, status, motivo, aprovador):
+    """
+    Adiciona um novo registro de acesso.
+    """
+    try:
+        sheet_operations = SheetOperations()
+        new_data = [
+            name, cpf, placa, marca_carro, horario_entrada, "", data, empresa, 
+            status, motivo, aprovador, data if not motivo else ""
+        ]
+        sheet_operations.adc_dados(new_data)
+        return True
+    except Exception as e:
+        st.error(f"Erro ao adicionar registro: {str(e)}")
+        return False
 
+def delete_record(name, data):
+    """
+    Deleta um registro de acesso.
+    """
+    try:
+        sheet_operations = SheetOperations()
+        df = pd.DataFrame(sheet_operations.carregar_dados()[1:], columns=sheet_operations.carregar_dados()[0])
+        
+        # Encontrar o registro para deletar
+        record = df[(df["Nome"] == name) & (df["Data"] == data)]
+        
+        if record.empty:
+            return False
+            
+        record_id = record.iloc[0][0]  # ID está na primeira coluna
+        return sheet_operations.excluir_dados(record_id)
+        
+    except Exception as e:
+        st.error(f"Erro ao deletar registro: {str(e)}")
+        return False
+
+def check_entry(name, data):
+    """
+    Verifica um registro de entrada.
+    """
+    try:
+        sheet_operations = SheetOperations()
+        df = pd.DataFrame(sheet_operations.carregar_dados()[1:], columns=sheet_operations.carregar_dados()[0])
+        
+        if data:
+            record = df[(df["Nome"] == name) & (df["Data"] == data)]
+        else:
+            record = df[df["Nome"] == name]
+            
+        if record.empty:
+            return None, "Registro não encontrado."
+            
+        return record.iloc[0], "Registro encontrado."
+        
+    except Exception as e:
+        st.error(f"Erro ao verificar registro: {str(e)}")
+        return None, f"Erro ao verificar registro: {str(e)}"
+
+def check_blocked_records(df):
+    """
+    Verifica registros bloqueados.
+    """
+    try:
+        blocked = df[df["Status da Entrada"] == "Bloqueado"]
+        if blocked.empty:
+            return None
+            
+        info = ""
+        for _, row in blocked.iterrows():
+            info += f"Nome: {row['Nome']}\n"
+            info += f"Motivo: {row['Motivo do Bloqueio']}\n"
+            info += f"Data: {row['Data']}\n"
+            info += "---\n"
+            
+        return info
+        
+    except Exception as e:
+        st.error(f"Erro ao verificar registros bloqueados: {str(e)}")
+        return None
+
+def get_block_info(name):
+    """
+    Obtém informações de bloqueio de uma pessoa.
+    """
+    try:
+        sheet_operations = SheetOperations()
+        df = pd.DataFrame(sheet_operations.carregar_dados()[1:], columns=sheet_operations.carregar_dados()[0])
+        
+        blocked = df[(df["Nome"] == name) & (df["Status da Entrada"] == "Bloqueado")]
+        if blocked.empty:
+            return None
+            
+        latest = blocked.iloc[0]
+        return {
+            "motivo": latest["Motivo do Bloqueio"],
+            "data": latest["Data"],
+            "aprovador": latest["Aprovador"]
+        }
+        
+    except Exception as e:
+        st.error(f"Erro ao obter informações de bloqueio: {str(e)}")
+        return None
 
 
 
