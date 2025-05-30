@@ -519,7 +519,7 @@ def update_exit_time(name, exit_date, exit_time):
                     record["CPF"],
                     record["Placa"],
                     record["Marca do Carro"],
-                    "00:00",  # Horário de Entrada
+                    "",  # Horário de Entrada em branco
                     "23:59",  # Horário de Saída
                     current_date.strftime("%d/%m/%Y"),
                     record["Empresa"],
@@ -537,7 +537,7 @@ def update_exit_time(name, exit_date, exit_time):
                 record["CPF"],
                 record["Placa"],
                 record["Marca do Carro"],
-                "00:00",  # Horário de Entrada
+                "",  # Horário de Entrada em branco
                 exit_time,  # Horário de Saída
                 exit_date,
                 record["Empresa"],
@@ -656,15 +656,6 @@ def get_block_info(name):
     except Exception as e:
         st.error(f"Erro ao obter informações de bloqueio: {str(e)}")
         return None
-
-
-
-
-
-
-
-
-
 
 
 
