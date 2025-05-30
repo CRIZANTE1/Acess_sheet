@@ -420,7 +420,7 @@ def vehicle_access_interface():
     
     # Consulta Geral de Pessoas Autorizadas e Bloqueadas
     with st.expander("Consulta Geral de Pessoas Autorizadas e Bloqueadas", expanded=False):
-        status_filter = st.selectbox("Selecione o Status para Consulta:", ["Todos", "Autorizada", "Bloqueada"])
+        status_filter = st.selectbox("Selecione o Status para Consulta:", ["Todos", "Autorizado", "Bloqueado"])
         empresa_filter = st.selectbox("Selecione a Empresa para Consulta:", ["Todas"] + list(st.session_state.df_acesso_veiculos["Empresa"].unique()))
 
         if st.button("Consultar"):
