@@ -408,7 +408,7 @@ def vehicle_access_interface():
                     st.write(f"Empresa: {person['Empresa']}")
                     st.write(f"Status de Entrada: {person['Status da Entrada']}")
 
-                    if person['Status da Entrada'] == 'Bloqueada':
+                    if person['Status da Entrada'] == 'Bloqueado':
                         st.write(f"Motivo do Bloqueio: {person['Motivo do Bloqueio']}")
                         st.write(f"Aprovador do Bloqueio: {person['Aprovador']}")
                     else:
@@ -436,7 +436,7 @@ def vehicle_access_interface():
             df_filtered = df_filtered[columns_to_display]
             
             if not df_filtered.empty:
-                st.write(f"Registros de Pessoas {status_filter}as na empresa {empresa_filter}:")
+                st.write(f"Registros de Pessoas com status {status_filter} na empresa {empresa_filter}:")
                 st.dataframe(df_filtered)
             else:
                 st.warning(f"Não há registros encontrados para o status {status_filter} e empresa {empresa_filter}.")
