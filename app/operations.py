@@ -30,6 +30,19 @@ class SheetOperations:
         """
         return self.carregar_dados_aba('funcionarios')
 
+    def carregar_dados_aprovadores(self):
+        """
+        Carrega os dados dos aprovadores da aba 'authorizer' do Google Sheets.
+        
+        Returns:
+            list: Lista com os nomes dos aprovadores autorizados.
+        """
+        dados = self.carregar_dados_aba('authorizer')
+        if dados and len(dados) > 1:  # Verifica se há dados além do cabeçalho
+            # Assume que a primeira coluna contém os nomes dos aprovadores
+            return [row[0] for row in dados[1:] if row[0].strip()]  # Retorna apenas nomes não vazios
+        return []
+
     def carregar_dados_aba(self, aba_name):
         if not self.credentials or not self.my_archive_google_sheets:
             return None
