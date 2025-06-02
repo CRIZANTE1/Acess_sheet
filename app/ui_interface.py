@@ -96,6 +96,10 @@ def round_to_nearest_interval(time_value, interval=1):
 def vehicle_access_interface():
     st.title("Controle de Acesso BAERI")
     
+    # Carregar aprovadores autorizados
+    sheet_operations = SheetOperations()
+    aprovadores_autorizados = sheet_operations.carregar_dados_aprovadores()
+    
     # BRIEFING DE SEGURANGA
     with st.expander('Briefing de segurança', expanded=True):
         st.write("**ATENÇÃO:**\n\n"
@@ -112,7 +116,6 @@ def vehicle_access_interface():
     blocks()
     
     # Recarregar os dados do Google Sheets para garantir que estão atualizados
-    sheet_operations = SheetOperations()
     data_from_sheet = sheet_operations.carregar_dados()
     if data_from_sheet:
         # Use the actual headers from the sheet
@@ -167,13 +170,26 @@ def vehicle_access_interface():
             empresa = st.text_input("Empresa:")
             status = st.selectbox("Status de Entrada", ["Autorizado", "Bloqueado"], index=0)
             motivo = st.text_input("Motivo do Bloqueio") if status == "Bloqueado" else ""
-            aprovador = st.text_input("Aprovador") if status == "Autorizado" else ""
+            
+            # Usar selectbox para aprovadores
+            if status == "Autorizado":
+                if aprovadores_autorizados:
+                    aprovador = st.selectbox("Aprovador:", options=aprovadores_autorizados)
+                else:
+                    st.error("Não foram encontrados aprovadores autorizados. Por favor, verifique a planilha.")
+                    aprovador = ""
+            else:
+                aprovador = ""
 
             if status == "Bloqueado":
                 st.warning("A liberação só pode ser feita por profissional da área responsável ou Gestor da UO.")
 
             if st.button("Adicionar Registro"):
                 if name and cpf and validate_cpf(cpf) and horario_entrada and data and empresa:
+                    if status == "Autorizado" and not aprovador:
+                        st.error("Por favor, selecione um aprovador autorizado.")
+                        return
+                        
                     data_obj = datetime.strptime(data.strftime("%Y-%m-%d"), "%Y-%m-%d")
                     data_formatada = data_obj.strftime("%d/%m/%Y")
 
@@ -274,13 +290,37 @@ def vehicle_access_interface():
                 index=status_options.index(status_value)
             )
             motivo = st.text_input("Motivo do Bloqueio", value=existing_record["Motivo do Bloqueio"]) if status == "Bloqueado" else ""
-            aprovador = st.text_input("Aprovador", value=existing_record["Aprovador"]) if status == "Autorizado" else ""
+            
+            # Usar selectbox para aprovadores na edição
+            if status == "Autorizado":
+                if aprovadores_autorizados:
+                    # Se o aprovador atual não está na lista, adicione-o temporariamente
+                    current_approver = existing_record["Aprovador"]
+                    if current_approver and current_approver not in aprovadores_autorizados:
+                        temp_aprovadores = [current_approver] + aprovadores_autorizados
+                    else:
+                        temp_aprovadores = aprovadores_autorizados
+                    
+                    aprovador = st.selectbox(
+                        "Aprovador:",
+                        options=temp_aprovadores,
+                        index=0 if current_approver in temp_aprovadores else 0
+                    )
+                else:
+                    st.error("Não foram encontrados aprovadores autorizados. Por favor, verifique a planilha.")
+                    aprovador = existing_record["Aprovador"]
+            else:
+                aprovador = ""
 
             if status == "Bloqueado":
                 st.warning("A liberação só pode ser feita por profissional da área responsável ou Gestor da UO.")
 
             if st.button("Atualizar Registro"):
                 if cpf and validate_cpf(cpf) and horario_entrada and data and empresa:
+                    if status == "Autorizado" and not aprovador:
+                        st.error("Por favor, selecione um aprovador autorizado.")
+                        return
+                        
                     data_obj = datetime.strptime(data.strftime("%Y-%m-%d"), "%Y-%m-%d")
                     data_formatada = data_obj.strftime("%d/%m/%Y")
 
@@ -462,6 +502,21 @@ def blocks():
         st.error("Registros Bloqueados:\n" + blocked_info)
     else:
         st.empty()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
