@@ -2,22 +2,33 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 
-def month_consult():
+def get_month_name(month):
+    """Retorna o nome do mês em português"""
+    meses = {
+        1: "Janeiro", 2: "Fevereiro", 3: "Março", 4: "Abril",
+        5: "Maio", 6: "Junho", 7: "Julho", 8: "Agosto",
+        9: "Setembro", 10: "Outubro", 11: "Novembro", 12: "Dezembro"
+    }
+    return meses.get(month, "")
+
+def month_consult(selected_month=None, selected_year=None):
     """Mostra estatísticas mensais dos acessos"""
     if "df_acesso_veiculos" in st.session_state:
-        df = st.session_state.df_acesso_veiculos
+        df = st.session_state.df_acesso_veiculos.copy()
         
         # Converter a coluna de data para datetime
         df['Data'] = pd.to_datetime(df['Data'], format='%d/%m/%Y')
         
-        # Obter o mês atual
-        current_month = datetime.now().month
-        current_year = datetime.now().year
+        # Se não foi especificado mês/ano, usar o atual
+        if selected_month is None:
+            selected_month = datetime.now().month
+        if selected_year is None:
+            selected_year = datetime.now().year
         
-        # Filtrar registros do mês atual
+        # Filtrar registros do mês selecionado
         df_month = df[
-            (df['Data'].dt.month == current_month) & 
-            (df['Data'].dt.year == current_year)
+            (df['Data'].dt.month == selected_month) & 
+            (df['Data'].dt.year == selected_year)
         ]
         
         # Calcular estatísticas
@@ -43,7 +54,7 @@ def month_consult():
             st.bar_chart(acessos_por_dia)
             st.caption("Acessos por dia do mês")
 
-def consulta_nome_mes():
+def consulta_nome_mes(selected_month=None, selected_year=None):
     """Consulta todas as entradas de uma pessoa específica no mês"""
     if "df_acesso_veiculos" in st.session_state:
         df = st.session_state.df_acesso_veiculos.copy()
@@ -51,26 +62,28 @@ def consulta_nome_mes():
         # Converter a coluna de data para datetime
         df['Data'] = pd.to_datetime(df['Data'], format='%d/%m/%Y')
         
-        # Obter o mês atual
-        current_month = datetime.now().month
-        current_year = datetime.now().year
+        # Se não foi especificado mês/ano, usar o atual
+        if selected_month is None:
+            selected_month = datetime.now().month
+        if selected_year is None:
+            selected_year = datetime.now().year
         
         # Lista de nomes únicos para seleção
         nomes_unicos = sorted(df['Nome'].unique())
         nome_selecionado = st.selectbox("Selecione o nome para consulta:", nomes_unicos)
         
         if nome_selecionado:
-            # Filtrar registros do mês atual para o nome específico
+            # Filtrar registros do mês selecionado para o nome específico
             df_pessoa = df[
-                (df['Data'].dt.month == current_month) & 
-                (df['Data'].dt.year == current_year) &
+                (df['Data'].dt.month == selected_month) & 
+                (df['Data'].dt.year == selected_year) &
                 (df['Nome'] == nome_selecionado)
             ]
             
             if df_pessoa.empty:
-                st.warning(f"Nenhum registro encontrado para {nome_selecionado} no mês atual.")
+                st.warning(f"Nenhum registro encontrado para {nome_selecionado} em {get_month_name(selected_month)} de {selected_year}.")
             else:
-                st.success(f"Encontrados {len(df_pessoa)} registros para {nome_selecionado} no mês atual:")
+                st.success(f"Encontrados {len(df_pessoa)} registros para {nome_selecionado} em {get_month_name(selected_month)} de {selected_year}:")
                 
                 # Calcular estatísticas da pessoa
                 acessos_autorizados = len(df_pessoa[df_pessoa['Status da Entrada'] == 'Autorizado'])
@@ -110,13 +123,33 @@ def summary_page():
 
     st.write("Aqui você pode visualizar um resumo dos dados de acesso de veículos.")
 
+    # Seleção de mês e ano
+    col1, col2 = st.columns(2)
+    with col1:
+        meses = {get_month_name(i): i for i in range(1, 13)}
+        mes_selecionado = st.selectbox(
+            "Selecione o mês:",
+            options=list(meses.keys()),
+            index=datetime.now().month - 1
+        )
+    with col2:
+        ano_atual = datetime.now().year
+        ano_selecionado = st.selectbox(
+            "Selecione o ano:",
+            options=range(ano_atual - 2, ano_atual + 1),
+            index=2
+        )
+
+    # Converter nome do mês para número
+    mes_numero = meses[mes_selecionado]
+
     # Criar abas para diferentes visualizações
     tab1, tab2 = st.tabs(["Estatísticas Gerais", "Consulta por Nome"])
     
     with tab1:
         # Mostrar estatísticas mensais
-        st.subheader("Estatísticas do Mês Atual")
-        month_consult()
+        st.subheader(f"Estatísticas de {mes_selecionado} de {ano_selecionado}")
+        month_consult(mes_numero, ano_selecionado)
 
         st.subheader("Contador de Redução de Papel")
 
@@ -138,8 +171,8 @@ def summary_page():
         st.table(df_reducao_papel)
         
     with tab2:
-        st.subheader("Consulta de Acessos por Nome")
-        consulta_nome_mes()
+        st.subheader(f"Consulta de Acessos por Nome - {mes_selecionado} de {ano_selecionado}")
+        consulta_nome_mes(mes_numero, ano_selecionado)
 
     st.info("Para realizar edições ou solicitar novas funcionalidades, por favor, entre em contato com o desenvolvedor.")
 
