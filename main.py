@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 from app.ui_interface import vehicle_access_interface
-from app.data_operations import mouth_consult
 from app.admin_page import admin_page
 from app.summary_page import summary_page 
 from auth.login_page import show_login_page, show_user_header, show_logout_button
@@ -33,27 +32,25 @@ def main():
 
         user_is_admin = is_admin()
         
-        page_options = [] # Começar com uma lista vazia
+        page_options = [] 
         if user_is_admin:
-            page_options.append("Controle de Acesso") # Adicionar Controle de Acesso apenas para admin
+            page_options.append("Controle de Acesso") 
             page_options.append("Configurações do Sistema")
             page_options.append("Resumo")
         else:
-            page_options.append("Resumo") # Adicionar opção de resumo para não administradores
+            page_options.append("Resumo") 
             
         page = st.sidebar.selectbox("Escolha a página:", page_options)
         
         if page == "Controle de Acesso":
             vehicle_access_interface()
-            mouth_consult()
-            
             
         elif page == "Configurações do Sistema":
             if user_is_admin:
                 admin_page()
             else:
                 st.error("Você não tem permissões para acessar esta página.")
-        elif page == "Resumo": # Adicionar a condição para a nova página de resumo
+        elif page == "Resumo": 
             summary_page()
     else:
         show_login_page()
@@ -62,5 +59,8 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+
 
 
