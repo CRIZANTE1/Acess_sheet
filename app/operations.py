@@ -123,6 +123,11 @@ class SheetOperations:
                 if str(new_id) not in existing_ids:
                     break
 
+            # Garantir que o horário de saída (índice 5) seja vazio APENAS para novos registros
+            # Se for uma edição (já existe um ID), manter o horário de saída existente
+            if len(new_data) > 5 and str(new_id) not in existing_ids:
+                new_data[5] = ""
+
             new_data.insert(0, new_id)  # Insere o novo ID no início da lista new_data
             aba.append_table(values=new_data)  # Adiciona a linha à tabela dinamicamente
             logging.info("Dados adicionados com sucesso.")
@@ -178,6 +183,11 @@ class SheetOperations:
         except Exception as e:
             logging.error(f"Erro ao excluir dados: {e}", exc_info=True)
             return False
+
+
+
+
+
 
 
 
