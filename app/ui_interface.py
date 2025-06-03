@@ -193,7 +193,7 @@ def vehicle_access_interface():
                     data_obj = datetime.strptime(data.strftime("%Y-%m-%d"), "%Y-%m-%d")
                     data_formatada = data_obj.strftime("%d/%m/%Y")
 
-                    success = add_record(
+                    success, message = add_record(
                         name, cpf, placa, marca_carro, 
                         horario_entrada, 
                         data_formatada,
@@ -203,12 +203,12 @@ def vehicle_access_interface():
                         aprovador
                     )
                     if success:
-                        st.success("Registro adicionado com sucesso!")
+                        st.success(message)
                         # Recarregar dados após a adição
                         st.session_state.df_acesso_veiculos = pd.DataFrame(sheet_operations.carregar_dados()[1:], columns=sheet_operations.carregar_dados()[0])
                         st.rerun()
                     else:
-                        st.error("Falha ao adicionar registro.")
+                        st.error(message)
                 else:
                     st.warning("Por favor, preencha todos os campos obrigatórios com dados válidos: Nome, CPF, Horário de Entrada, Data e Empresa.")
         else:
@@ -324,7 +324,25 @@ def vehicle_access_interface():
                     data_obj = datetime.strptime(data.strftime("%Y-%m-%d"), "%Y-%m-%d")
                     data_formatada = data_obj.strftime("%d/%m/%Y")
 
-                    success = add_record(
+                    # Verificar se está tentando mudar para uma data que já tem registro
+                    if data_formatada != existing_record["Data"]:
+                        sheet_operations = SheetOperations()
+                        df = pd.DataFrame(sheet_operations.carregar_dados()[1:], columns=sheet_operations.carregar_dados()[0])
+                        existing_entries = df[
+                            (df["Nome"] == name_to_add_or_edit) &
+                            (df["Data"] == data_formatada)
+                        ]
+                        
+                        if not existing_entries.empty:
+                            st.error(f"Já existe um registro para {name_to_add_or_edit} na data {data_formatada}. Não é possível ter múltiplos registros no mesmo dia.")
+                            return
+
+                    # Se o registro atual tem horário de saída, não permitir alterações
+                    if existing_record["Horário de Saída"] and existing_record["Horário de Saída"].strip():
+                        st.error("Não é possível editar um registro que já tem horário de saída registrado. Se necessário, delete o registro e crie um novo.")
+                        return
+
+                    success, message = add_record(
                         name_to_add_or_edit, 
                         cpf, 
                         placa, 
@@ -337,12 +355,12 @@ def vehicle_access_interface():
                         aprovador
                     )
                     if success:
-                        st.success("Registro atualizado com sucesso!")
+                        st.success(message)
                         # Recarregar dados após a atualização
                         st.session_state.df_acesso_veiculos = pd.DataFrame(sheet_operations.carregar_dados()[1:], columns=sheet_operations.carregar_dados()[0])
                         st.rerun()
                     else:
-                        st.error("Falha ao atualizar registro.")
+                        st.error(message)
                 else:
                     st.warning("Por favor, preencha todos os campos obrigatórios com dados válidos: CPF, Horário de Entrada, Data e Empresa.")
                 
@@ -502,14 +520,6 @@ def blocks():
         st.error("Registros Bloqueados:\n" + blocked_info)
     else:
         st.empty()
-
-
-
-
-
-
-
-
 
 
 
