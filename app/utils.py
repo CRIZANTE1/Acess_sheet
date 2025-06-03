@@ -24,7 +24,7 @@ def format_cpf(cpf):
 
 def validate_cpf(cpf):
     """Valida o CPF"""
-    # Remove caracteres não numéricos
+    # Remove caracteres não numéricos e espaços
     cpf = ''.join(filter(str.isdigit, str(cpf)))
     
     # Verifica se tem 11 dígitos
@@ -36,19 +36,29 @@ def validate_cpf(cpf):
         return False
     
     # Validação do primeiro dígito verificador
-    soma = sum(int(cpf[i]) * (10 - i) for i in range(9))
-    resto = (soma * 10) % 11
-    if resto == 10:
-        resto = 0
-    if resto != int(cpf[9]):
+    soma = 0
+    peso = 10
+    for i in range(9):
+        soma += int(cpf[i]) * peso
+        peso -= 1
+    
+    resto = soma % 11
+    digito1 = 0 if resto < 2 else 11 - resto
+    
+    if digito1 != int(cpf[9]):
         return False
     
     # Validação do segundo dígito verificador
-    soma = sum(int(cpf[i]) * (11 - i) for i in range(10))
-    resto = (soma * 10) % 11
-    if resto == 10:
-        resto = 0
-    if resto != int(cpf[10]):
+    soma = 0
+    peso = 11
+    for i in range(10):
+        soma += int(cpf[i]) * peso
+        peso -= 1
+    
+    resto = soma % 11
+    digito2 = 0 if resto < 2 else 11 - resto
+    
+    if digito2 != int(cpf[10]):
         return False
     
     return True
