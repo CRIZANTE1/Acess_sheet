@@ -325,7 +325,7 @@ def vehicle_access_interface():
                     data_formatada = data_obj.strftime("%d/%m/%Y")
 
                     # Obter o ID do registro existente
-                    existing_record_id = existing_record[0]  # O ID está na primeira coluna
+                    existing_record_id = existing_record.iloc[0]  # O ID está na primeira coluna
                     
                     # Preparar dados atualizados
                     updated_data = [
@@ -510,7 +510,6 @@ def blocks():
         st.error("Registros Bloqueados:\n" + blocked_info)
     else:
         st.empty()
-
 
 
 
