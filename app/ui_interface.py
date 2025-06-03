@@ -193,7 +193,7 @@ def vehicle_access_interface():
                     data_obj = datetime.strptime(data.strftime("%Y-%m-%d"), "%Y-%m-%d")
                     data_formatada = data_obj.strftime("%d/%m/%Y")
 
-                    success, message = add_record(
+                    success = add_record(
                         name, cpf, placa, marca_carro, 
                         horario_entrada, 
                         data_formatada,
@@ -203,12 +203,12 @@ def vehicle_access_interface():
                         aprovador
                     )
                     if success:
-                        st.success(message)
+                        st.success("Registro adicionado com sucesso!")
                         # Recarregar dados após a adição
                         st.session_state.df_acesso_veiculos = pd.DataFrame(sheet_operations.carregar_dados()[1:], columns=sheet_operations.carregar_dados()[0])
                         st.rerun()
                     else:
-                        st.error(message)
+                        st.error("Falha ao adicionar registro.")
                 else:
                     st.warning("Por favor, preencha todos os campos obrigatórios com dados válidos: Nome, CPF, Horário de Entrada, Data e Empresa.")
         else:
@@ -324,27 +324,7 @@ def vehicle_access_interface():
                     data_obj = datetime.strptime(data.strftime("%Y-%m-%d"), "%Y-%m-%d")
                     data_formatada = data_obj.strftime("%d/%m/%Y")
 
-                    # Se o registro atual tem horário de saída, não permitir alterações
-                    horario_saida_existente = existing_record["Horário de Saída"]
-                    # Verifica se o horário de saída é válido e não vazio
-                    tem_saida = False
-                    if horario_saida_existente is not None:
-                        # Remove espaços em branco e verifica se não é vazio
-                        horario_limpo = str(horario_saida_existente).strip()
-                        if horario_limpo:
-                            try:
-                                # Tenta converter para datetime para validar se é um horário válido
-                                datetime.strptime(horario_limpo, "%H:%M")
-                                tem_saida = True
-                            except ValueError:
-                                # Se não conseguir converter, não é um horário válido
-                                tem_saida = False
-
-                    if tem_saida:
-                        st.error("Não é possível editar um registro que já tem horário de saída registrado. Se necessário, delete o registro e crie um novo.")
-                        return
-
-                    success, message = add_record(
+                    success = add_record(
                         name_to_add_or_edit, 
                         cpf, 
                         placa, 
@@ -357,12 +337,12 @@ def vehicle_access_interface():
                         aprovador
                     )
                     if success:
-                        st.success(message)
+                        st.success("Registro atualizado com sucesso!")
                         # Recarregar dados após a atualização
                         st.session_state.df_acesso_veiculos = pd.DataFrame(sheet_operations.carregar_dados()[1:], columns=sheet_operations.carregar_dados()[0])
                         st.rerun()
                     else:
-                        st.error(message)
+                        st.error("Falha ao atualizar registro.")
                 else:
                     st.warning("Por favor, preencha todos os campos obrigatórios com dados válidos: CPF, Horário de Entrada, Data e Empresa.")
                 
@@ -522,6 +502,10 @@ def blocks():
         st.error("Registros Bloqueados:\n" + blocked_info)
     else:
         st.empty()
+
+
+
+
 
 
 
