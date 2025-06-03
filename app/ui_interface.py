@@ -3,7 +3,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 from app.data_operations import add_record, update_exit_time, delete_record, check_entry, check_blocked_records, get_block_info
 from app.operations import SheetOperations
-from app.utils import generate_time_options, format_cpf, validate_cpf, round_to_nearest_interval
+from app.utils import generate_time_options, format_cpf, validate_cpf, test_cpf, round_to_nearest_interval
 
 def vehicle_access_interface():
     st.title("Controle de Acesso BAERI")
@@ -36,6 +36,16 @@ def vehicle_access_interface():
         
         # Garantir que valores nulos ou vazios sejam tratados corretamente
         df_temp = df_temp.fillna("")
+        
+        # Converter a coluna de data para datetime para ordenação correta
+        df_temp['Data_Ordenacao'] = pd.to_datetime(df_temp['Data'], format='%d/%m/%Y', errors='coerce')
+        
+        # Ordenar por data (mais recente primeiro) e horário de entrada
+        df_temp = df_temp.sort_values(by=['Data_Ordenacao', 'Horário de Entrada'], ascending=[False, False])
+        
+        # Remover a coluna auxiliar de ordenação
+        df_temp = df_temp.drop('Data_Ordenacao', axis=1)
+        
         st.session_state.df_acesso_veiculos = df_temp
     else:
         st.session_state.df_acesso_veiculos = pd.DataFrame(columns=[
@@ -59,7 +69,7 @@ def vehicle_access_interface():
             # Validação do CPF
             if cpf:
                 if not validate_cpf(cpf):
-                    st.error("CPF inválido! Por favor, insira um CPF válido.")
+                    st.error("CPF inválido! O CPF deve ter 11 dígitos.")
                 else:
                     cpf = format_cpf(cpf)
             
@@ -414,6 +424,24 @@ def blocks():
         st.error("Registros Bloqueados:\n" + blocked_info)
     else:
         st.empty()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
