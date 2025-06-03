@@ -1,188 +1,333 @@
 import streamlit as st
 import pandas as pd
-import logging
-import random
-from app.sheets_api import connect_sheet
+from datetime import datetime, timedelta
+from app.operations import SheetOperations
 
+def generate_time_options():
+    times = []
+    start_time = datetime.strptime("00:00", "%H:%M")
+    end_time = datetime.strptime("23:59", "%H:%M")
 
-class SheetOperations:
+    current_time = start_time
+    while current_time <= end_time:
+        times.append(current_time.strftime("%H:%M"))
+        current_time += timedelta(minutes=1)
     
-    def __init__(self):
-        """
-        O código define uma classe com métodos para conectar-se a um documento Google Sheets, carregar dados de
-        uma planilha específica, adicionar novos dados com um ID único, editar dados existentes com base no ID
-        e excluir dados com base no ID.
-        """
-        self.credentials, self.my_archive_google_sheets = connect_sheet()
-        if not self.credentials or not self.my_archive_google_sheets:
-            logging.error("Credenciais ou URL do Google Sheets inválidos.")
+    return times
 
-    def carregar_dados(self):
-        return self.carregar_dados_aba('acess')
+def format_cpf(cpf):
+    """Formata o CPF no padrão XXX.XXX.XXX-XX"""
+    # Remove caracteres não numéricos
+    cpf = ''.join(filter(str.isdigit, str(cpf)))
+    if len(cpf) != 11:
+        return cpf
+    return f"{cpf[:3]}.{cpf[3:6]}.{cpf[6:9]}-{cpf[9:]}"
+
+def validate_cpf(cpf):
+    """Valida o CPF"""
+    # Remove caracteres não numéricos
+    cpf = ''.join(filter(str.isdigit, str(cpf)))
     
-    def carregar_dados_funcionarios(self):
-        """
-        Carrega os dados dos funcionários da aba 'funcionarios' do Google Sheets.
-        
-        Returns:
-            list: Lista com os dados dos funcionários, onde o primeiro item são os cabeçalhos
-                 e os demais são os dados de cada funcionário.
-        """
-        return self.carregar_dados_aba('funcionarios')
+    # Verifica se tem 11 dígitos
+    if len(cpf) != 11:
+        return False
+    
+    # Verifica se todos os dígitos são iguais
+    if len(set(cpf)) == 1:
+        return False
+    
+    # Validação do primeiro dígito verificador
+    soma = sum(int(cpf[i]) * (10 - i) for i in range(9))
+    resto = (soma * 10) % 11
+    if resto == 10:
+        resto = 0
+    if resto != int(cpf[9]):
+        return False
+    
+    # Validação do segundo dígito verificador
+    soma = sum(int(cpf[i]) * (11 - i) for i in range(10))
+    resto = (soma * 10) % 11
+    if resto == 10:
+        resto = 0
+    if resto != int(cpf[10]):
+        return False
+    
+    return True
 
-    def carregar_dados_aprovadores(self):
-        """
-        Carrega os dados dos aprovadores da aba 'authorizer' do Google Sheets.
+def round_to_nearest_interval(time_value, interval=1):
+    """Arredonda o horário para o intervalo mais próximo"""
+    try:
+        # Se for string vazia ou None, retorna horário atual
+        if pd.isna(time_value) or time_value == "":
+            now = datetime.now()
+            return now.strftime("%H:%M")
         
-        Returns:
-            list: Lista com os nomes dos aprovadores autorizados.
-        """
-        dados = self.carregar_dados_aba('authorizer')
-        if dados and len(dados) > 1:  # Verifica se há dados além do cabeçalho
-            # Assume que a primeira coluna contém os nomes dos aprovadores
-            return [row[0] for row in dados[1:] if row[0].strip()]  # Retorna apenas nomes não vazios
-        return []
+        # Se for número (minutos desde meia-noite)
+        if isinstance(time_value, (int, float)):
+            hours = int(time_value // 60)
+            minutes = int(time_value % 60)
+            time_str = f"{hours:02d}:{minutes:02d}"
+        else:
+            time_str = str(time_value)
+        
+        # Tenta converter para datetime
+        try:
+            time = datetime.strptime(time_str, "%H:%M")
+        except ValueError:
+            # Se falhar, usa horário atual
+            now = datetime.now()
+            return now.strftime("%H:%M")
+        
+        # Arredonda para o intervalo mais próximo
+        total_minutes = time.hour * 60 + time.minute
+        rounded_minutes = (total_minutes // interval) * interval
+        
+        # Converte de volta para horas e minutos
+        hours = rounded_minutes // 60
+        minutes = rounded_minutes % 60
+        
+        return f"{hours:02d}:{minutes:02d}"
+    except Exception:
+        # Em caso de qualquer erro, retorna horário atual
+        now = datetime.now()
+        return now.strftime("%H:%M")
 
-    def carregar_dados_aba(self, aba_name):
-        if not self.credentials or not self.my_archive_google_sheets:
+def update_exit_time(name, exit_date, exit_time):
+    """
+    Atualiza o horário de saída de um registro, lidando corretamente com registros que atravessam a meia-noite.
+    """
+    try:
+        sheet_operations = SheetOperations()
+        df = pd.DataFrame(sheet_operations.carregar_dados()[1:], columns=sheet_operations.carregar_dados()[0])
+        
+        # Encontrar o registro em aberto mais recente para a pessoa
+        person_records = df[
+            (df["Nome"] == name) &
+            ((df["Horário de Saída"].isna()) | (df["Horário de Saída"] == ""))
+        ]
+        
+        if person_records.empty:
+            return False, "Nenhum registro em aberto encontrado para esta pessoa."
+        
+        # Pegar o registro mais recente (assumindo que a data está no formato dd/mm/yyyy)
+        record = person_records.iloc[0]
+        record_id = record.iloc[0]  # ID do registro
+        
+        # Converter datas e horários para datetime
+        entry_date = datetime.strptime(record["Data"], "%d/%m/%Y")
+        entry_time = datetime.strptime(record["Horário de Entrada"], "%H:%M")
+        exit_date_obj = datetime.strptime(exit_date, "%d/%m/%Y")
+        exit_time_obj = datetime.strptime(exit_time, "%H:%M")
+        
+        # Combinar data e hora
+        entry_datetime = datetime.combine(entry_date.date(), entry_time.time())
+        exit_datetime = datetime.combine(exit_date_obj.date(), exit_time_obj.time())
+        
+        # Se a saída é no mesmo dia da entrada
+        if entry_date.date() == exit_date_obj.date():
+            # Atualizar o registro com o horário de saída
+            updated_data = [record.iloc[i] for i in range(1, len(record))]  # Excluir o ID usando iloc
+            updated_data[5] = exit_time  # Índice 5 é o Horário de Saída
+            sheet_operations.editar_dados(record_id, updated_data)
+            return True, "Horário de saída atualizado com sucesso."
+        
+        # Se a saída é em um dia diferente
+        else:
+            # 1. Fechar o registro do dia anterior às 23:59
+            updated_data = [record.iloc[i] for i in range(1, len(record))]  # Excluir o ID usando iloc
+            updated_data[5] = "23:59"  # Horário de Saída
+            sheet_operations.editar_dados(record_id, updated_data)
+            
+            # 2. Criar registros para os dias intermediários (se houver)
+            current_date = entry_date + timedelta(days=1)
+            while current_date.date() < exit_date_obj.date():
+                new_data = [
+                    record["Nome"],
+                    record["CPF"],
+                    record["Placa"],
+                    record["Marca do Carro"],
+                    "",  # Horário de Entrada em branco
+                    "23:59",  # Horário de Saída
+                    current_date.strftime("%d/%m/%Y"),
+                    record["Empresa"],
+                    record["Status da Entrada"],
+                    record["Motivo do Bloqueio"],
+                    record["Aprovador"],
+                    record["Data do Primeiro Registro"] if "Data do Primeiro Registro" in record else ""
+                ]
+                sheet_operations.adc_dados(new_data)
+                current_date += timedelta(days=1)
+            
+            # 3. Criar registro final com a saída no horário informado
+            final_data = [
+                record["Nome"],
+                record["CPF"],
+                record["Placa"],
+                record["Marca do Carro"],
+                "",  # Horário de Entrada em branco
+                exit_time,  # Horário de Saída
+                exit_date,
+                record["Empresa"],
+                record["Status da Entrada"],
+                record["Motivo do Bloqueio"],
+                record["Aprovador"],
+                record["Data do Primeiro Registro"] if "Data do Primeiro Registro" in record else ""
+            ]
+            sheet_operations.adc_dados(final_data)
+            
+            return True, "Registros atualizados com sucesso para todo o período."
+            
+    except Exception as e:
+        return False, f"Erro ao atualizar horário de saída: {str(e)}"
+
+def check_duplicate_entry(name, data, horario_entrada):
+    """
+    Verifica se já existe um registro para a pessoa na mesma data e horário.
+    """
+    try:
+        sheet_operations = SheetOperations()
+        df = pd.DataFrame(sheet_operations.carregar_dados()[1:], columns=sheet_operations.carregar_dados()[0])
+        
+        duplicates = df[
+            (df["Nome"] == name) & 
+            (df["Data"] == data) & 
+            (df["Horário de Entrada"] == horario_entrada)
+        ]
+        
+        return not duplicates.empty
+        
+    except Exception as e:
+        st.error(f"Erro ao verificar registros duplicados: {str(e)}")
+        return False
+
+def add_record(name, cpf, placa, marca_carro, horario_entrada, data, empresa, status, motivo, aprovador):
+    """
+    Adiciona um novo registro de acesso.
+    """
+    try:
+        # Verifica se já existe um registro duplicado
+        if check_duplicate_entry(name, data, horario_entrada):
+            st.warning("Já existe um registro para esta pessoa nesta data e horário.")
+            return False
+            
+        sheet_operations = SheetOperations()
+        new_data = [
+            name, cpf, placa, marca_carro, horario_entrada, "", data, empresa, 
+            status, motivo, aprovador, data if not motivo else ""
+        ]
+        sheet_operations.adc_dados(new_data)
+        return True
+    except Exception as e:
+        st.error(f"Erro ao adicionar registro: {str(e)}")
+        return False
+
+def delete_record(name, data):
+    """
+    Deleta um registro de acesso.
+    """
+    try:
+        sheet_operations = SheetOperations()
+        df = pd.DataFrame(sheet_operations.carregar_dados()[1:], columns=sheet_operations.carregar_dados()[0])
+        
+        # Encontrar o registro para deletar
+        record = df[(df["Nome"] == name) & (df["Data"] == data)]
+        
+        if record.empty:
+            return False
+            
+        record_id = record.iloc[0].iloc[0]  # ID está na primeira coluna, usando iloc duas vezes
+        return sheet_operations.excluir_dados(record_id)
+        
+    except Exception as e:
+        st.error(f"Erro ao deletar registro: {str(e)}")
+        return False
+
+def check_entry(name, data):
+    """
+    Verifica um registro de entrada.
+    """
+    try:
+        sheet_operations = SheetOperations()
+        df = pd.DataFrame(sheet_operations.carregar_dados()[1:], columns=sheet_operations.carregar_dados()[0])
+        
+        if data:
+            record = df[(df["Nome"] == name) & (df["Data"] == data)]
+        else:
+            record = df[df["Nome"] == name]
+            
+        if record.empty:
+            return None, "Registro não encontrado."
+            
+        return record.iloc[0], "Registro encontrado."
+        
+    except Exception as e:
+        st.error(f"Erro ao verificar registro: {str(e)}")
+        return None, f"Erro ao verificar registro: {str(e)}"
+
+def check_blocked_records(df):
+    """
+    Verifica registros bloqueados.
+    """
+    try:
+        blocked = df[df["Status da Entrada"] == "Bloqueado"]
+        if blocked.empty:
             return None
-        try:
-            logging.info(f"Tentando ler dados da aba '{aba_name}'...")
             
-            archive = self.credentials.open_by_url(self.my_archive_google_sheets)
+        info = ""
+        for _, row in blocked.iterrows():
+            info += f"Nome: {row['Nome']}\n"
+            info += f"Motivo: {row['Motivo do Bloqueio']}\n"
+            info += f"Data: {row['Data']}\n"
+            info += "---\n"
             
-            if aba_name not in [sheet.title for sheet in archive.worksheets()]:
-                logging.error(f"A aba '{aba_name}' não existe no Google Sheets.")
-                st.error(f"A aba '{aba_name}' não foi encontrada na planilha.")
-                return None
-            
-            aba = archive.worksheet_by_title(aba_name)
-            data = aba.get_all_values()
-            
-            if not data:
-                logging.warning(f"A aba '{aba_name}' está vazia.")
-                return []
-
-            # Identificar colunas com nomes não vazios na primeira linha (cabeçalhos)
-            header = data[0]
-            valid_columns_indices = [i for i, col_name in enumerate(header) if col_name.strip()]
-            
-            if not valid_columns_indices:
-                logging.warning(f"Nenhum cabeçalho válido encontrado na aba '{aba_name}'.")
-                return []
-
-            # Filtrar os dados para incluir apenas as colunas válidas e tratar valores vazios
-            filtered_data = []
-            filtered_data.append([header[i] for i in valid_columns_indices])  # Adiciona os cabeçalhos
-            
-            for row in data[1:]:  # Para cada linha de dados
-                filtered_row = []
-                for i in valid_columns_indices:
-                    value = row[i] if i < len(row) else ""  # Trata índices fora do range
-                    
-                    # Tratamento especial para preservar números longos
-                    if isinstance(value, (int, float)) or (isinstance(value, str) and value.replace('.','').replace(',','').isdigit()):
-                        try:
-                            # Tenta converter para número e depois para string para remover notação científica
-                            value = str(int(float(str(value).replace(',', '').replace('.', ''))))
-                        except (ValueError, TypeError):
-                            value = str(value).strip()
-                    else:
-                        value = str(value).strip() if value is not None else ""
-                    
-                    filtered_row.append(value)
-                filtered_data.append(filtered_row)
-            
-            logging.info(f"Dados da aba '{aba_name}' lidos e filtrados com sucesso.")
-            return filtered_data
+        return info
         
-        except Exception as e:
-            logging.error(f"Erro ao ler dados da aba '{aba_name}': {e}")
-            st.error(f"Erro ao ler dados da aba '{aba_name}': {e}")
+    except Exception as e:
+        st.error(f"Erro ao verificar registros bloqueados: {str(e)}")
+        return None
+
+def get_block_info(name):
+    """
+    Obtém informações de bloqueio de uma pessoa.
+    """
+    try:
+        sheet_operations = SheetOperations()
+        df = pd.DataFrame(sheet_operations.carregar_dados()[1:], columns=sheet_operations.carregar_dados()[0])
+        
+        blocked = df[(df["Nome"] == name) & (df["Status da Entrada"] == "Bloqueado")]
+        if blocked.empty:
             return None
+            
+        latest = blocked.iloc[0]
+        return {
+            "motivo": latest["Motivo do Bloqueio"],
+            "data": latest["Data"],
+            "aprovador": latest["Aprovador"]
+        }
         
-        
-    def adc_dados(self, new_data):
-        if not self.credentials or not self.my_archive_google_sheets:
-            return
-        try:
-            logging.info(f"Tentando adicionar dados: {new_data}")
-            archive = self.credentials.open_by_url(self.my_archive_google_sheets)
-            aba_name = 'acess'
-            if aba_name not in [sheet.title for sheet in archive.worksheets()]:
-                logging.error(f"A aba '{aba_name}' não existe no Google Sheets.")
-                st.error(f"A aba '{aba_name}' não foi encontrada na planilha.")
-                return
-            aba = archive.worksheet_by_title(aba_name)
+    except Exception as e:
+        st.error(f"Erro ao obter informações de bloqueio: {str(e)}")
+        return None
 
-            # Esta parte do código está gerando um novo ID único para os dados a serem adicionados ao
-            # Google Sheets. O ID é um número aleatório de 4 dígitos que não pode ser repetido.
-            existing_ids = [row[0] for row in aba.get_all_values()[1:]]  #
-            while True:
-                new_id = random.randint(1000, 9999)
-                if str(new_id) not in existing_ids:
-                    break
 
-            # Garantir que o horário de saída (índice 5) seja vazio APENAS para novos registros
-            # Se for uma edição (já existe um ID), manter o horário de saída existente
-            if len(new_data) > 5 and str(new_id) not in existing_ids:
-                new_data[5] = ""
 
-            new_data.insert(0, new_id)  # Insere o novo ID no início da lista new_data
-            aba.append_table(values=new_data)  # Adiciona a linha à tabela dinamicamente
-            logging.info("Dados adicionados com sucesso.")
-            st.success("Dados adicionados com sucesso!")
-        except Exception as e:
-            logging.error(f"Erro ao adicionar dados: {e}", exc_info=True)
-            st.error(f"Erro ao adicionar dados: {e}")
 
-    def editar_dados(self, id, updated_data):
-        if not self.credentials or not self.my_archive_google_sheets:
-            return False
-        try:
-            logging.info(f"Tentando editar dados do ID {id}")
-            archive = self.credentials.open_by_url(self.my_archive_google_sheets)
-            aba = archive.worksheet_by_title('acess')
-            data = aba.get_all_values()
-            
-            # Procurar a linha com o ID correspondente
-            for i, row in enumerate(data):
-                if row[0] == str(id):  # ID está na primeira coluna
-                    # Atualizar a linha com os novos dados, mantendo o ID original
-                    updated_row = [str(id)] + updated_data
-                    aba.update_row(i + 1, updated_row)  # +1 porque as linhas começam em 1
-                    logging.info("Dados editados com sucesso.")
-                    return True
-                    
-            logging.error(f"ID {id} não encontrado.")
-            return False
-            
-        except Exception as e:
-            logging.error(f"Erro ao editar dados: {e}", exc_info=True)
-            return False
 
-    def excluir_dados(self, id):
-        if not self.credentials or not self.my_archive_google_sheets:
-            return False
-        try:
-            logging.info(f"Tentando excluir dados do ID {id}")
-            archive = self.credentials.open_by_url(self.my_archive_google_sheets)
-            aba = archive.worksheet_by_title('acess')
-            data = aba.get_all_values()
-            
-            # Procurar a linha com o ID correspondente
-            for i, row in enumerate(data):
-                if row[0] == str(id):  # ID está na primeira coluna
-                    aba.delete_rows(i + 1)  # +1 porque as linhas começam em 1
-                    logging.info("Dados excluídos com sucesso.")
-                    return True
-                    
-            logging.error(f"ID {id} não encontrado.")
-            return False
-            
-        except Exception as e:
-            logging.error(f"Erro ao excluir dados: {e}", exc_info=True)
-            return False
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
