@@ -24,50 +24,16 @@ def format_cpf(cpf):
     return f"{cpf[:3]}.{cpf[3:6]}.{cpf[6:9]}-{cpf[9:]}"
 
 def validate_cpf(cpf, debug=True):
-    """Valida o CPF"""
-    try:
-        # Remove caracteres não numéricos e espaços
-        cpf = ''.join(filter(str.isdigit, str(cpf)))
-        
-        # Verifica se tem 11 dígitos
-        if len(cpf) != 11:
-            if debug:
-                st.warning(f"CPF deve ter 11 dígitos. Encontrado: {len(cpf)}")
-            return False
-        
-        # Verifica se todos os dígitos são iguais
-        if len(set(cpf)) == 1:
-            if debug:
-                st.warning("CPF não pode ter todos os dígitos iguais")
-            return False
-        
-        # Lista com os dígitos do CPF
-        numeros = [int(digito) for digito in cpf]
-        
-        # Validação do primeiro dígito verificador
-        soma = sum(a * b for a, b in zip(numeros[0:9], range(10, 1, -1)))
-        digito1 = (soma * 10 % 11) % 10
-        
-        if numeros[9] != digito1:
-            if debug:
-                st.warning(f"Primeiro dígito verificador incorreto. Calculado: {digito1}, Encontrado: {numeros[9]}")
-            return False
-            
-        # Validação do segundo dígito verificador
-        soma = sum(a * b for a, b in zip(numeros[0:10], range(11, 1, -1)))
-        digito2 = (soma * 10 % 11) % 10
-        
-        if numeros[10] != digito2:
-            if debug:
-                st.warning(f"Segundo dígito verificador incorreto. Calculado: {digito2}, Encontrado: {numeros[10]}")
-            return False
-            
-        return True
-        
-    except Exception as e:
+    """Verifica se o CPF tem 11 dígitos"""
+    # Remove caracteres não numéricos e espaços
+    cpf = ''.join(filter(str.isdigit, str(cpf)))
+    
+    # Verifica se tem 11 dígitos
+    if len(cpf) != 11:
         if debug:
-            st.error(f"Erro ao validar CPF: {str(e)}")
+            st.warning(f"CPF deve ter 11 dígitos. Encontrado: {len(cpf)}")
         return False
+    return True
 
 def test_cpf(cpf_to_test):
     """Função para testar a validação de CPF"""
