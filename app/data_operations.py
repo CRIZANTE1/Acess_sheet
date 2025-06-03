@@ -111,7 +111,7 @@ def update_exit_time(name, exit_date, exit_time):
         
         # Pegar o registro mais recente (assumindo que a data está no formato dd/mm/yyyy)
         record = person_records.iloc[0]
-        record_id = record[0]  # ID do registro
+        record_id = record.iloc[0]  # ID do registro
         
         # Converter datas e horários para datetime
         entry_date = datetime.strptime(record["Data"], "%d/%m/%Y")
@@ -308,6 +308,10 @@ def get_block_info(name):
     except Exception as e:
         st.error(f"Erro ao obter informações de bloqueio: {str(e)}")
         return None
+
+
+
+
 
 
 
