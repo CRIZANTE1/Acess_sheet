@@ -151,26 +151,13 @@ def vehicle_access_interface():
                 else:
                     cpf = format_cpf(cpf)
             
-            # Buscar último registro do veículo para esta pessoa
-            last_vehicle_data = None
-            if name:
-                person_records = st.session_state.df_acesso_veiculos[
-                    st.session_state.df_acesso_veiculos["Nome"] == name
-                ]
-                if not person_records.empty:
-                    last_vehicle_data = person_records.iloc[-1]
-
             # Adicionar checkbox para controle de veículo
             com_veiculo = st.checkbox("Entrada com veículo")
             
             # Campos de veículo só aparecem se a checkbox estiver marcada
             if com_veiculo:
-                # Preencher com dados do último registro se disponível
-                default_placa = last_vehicle_data["Placa"] if last_vehicle_data is not None else ""
-                default_marca = last_vehicle_data["Marca do Carro"] if last_vehicle_data is not None else ""
-                
-                placa = st.text_input("Placa do Carro:", value=default_placa)
-                marca_carro = st.text_input("Marca do Carro:", value=default_marca)
+                placa = st.text_input("Placa do Carro:")
+                marca_carro = st.text_input("Marca do Carro:")
             else:
                 placa = ""
                 marca_carro = ""
@@ -206,7 +193,6 @@ def vehicle_access_interface():
                     data_obj = datetime.strptime(data.strftime("%Y-%m-%d"), "%Y-%m-%d")
                     data_formatada = data_obj.strftime("%d/%m/%Y")
 
-                    # Garantir que o horário de saída seja vazio ao adicionar novo registro
                     success = add_record(
                         name, cpf, placa, marca_carro, 
                         horario_entrada, 
@@ -226,35 +212,8 @@ def vehicle_access_interface():
                 else:
                     st.warning("Por favor, preencha todos os campos obrigatórios com dados válidos: Nome, CPF, Horário de Entrada, Data e Empresa.")
         else:
-            # Mostrar registros disponíveis para a pessoa selecionada
-            person_records = st.session_state.df_acesso_veiculos[
-                st.session_state.df_acesso_veiculos["Nome"] == name_to_add_or_edit
-            ]
-            
-            # Converter datas para datetime para ordenação
-            person_records['Data'] = pd.to_datetime(person_records['Data'], format='%d/%m/%Y')
-            person_records = person_records.sort_values('Data', ascending=False)
-            
-            # Criar lista de opções com data e horário
-            record_options = [f"{row['Data'].strftime('%d/%m/%Y')} - {row['Horário de Entrada']}" 
-                            for _, row in person_records.iterrows()]
-            
-            selected_record = st.selectbox(
-                "Selecione o registro para editar:",
-                options=record_options
-            )
-            
-            # Encontrar o registro selecionado
-            selected_date = selected_record.split(" - ")[0]
-            selected_time = selected_record.split(" - ")[1]
-            
-            existing_record = person_records[
-                (person_records['Data'].dt.strftime('%d/%m/%Y') == selected_date) & 
-                (person_records['Horário de Entrada'] == selected_time)
-            ].iloc[0]
-            
-            # Converter a data de volta para string para exibição
-            person_records['Data'] = person_records['Data'].dt.strftime('%d/%m/%Y')
+            # Campos para editar registro existente
+            existing_record = st.session_state.df_acesso_veiculos[st.session_state.df_acesso_veiculos["Nome"] == name_to_add_or_edit].iloc[0]
             
             # Mostrar informações atuais do registro
             st.info(f"""
@@ -262,9 +221,6 @@ def vehicle_access_interface():
             - Horário de Entrada: {existing_record['Horário de Entrada']}
             - Horário de Saída: {existing_record['Horário de Saída'] if existing_record['Horário de Saída'] else 'Não registrado'}
             - Data: {existing_record['Data']}
-            - Empresa: {existing_record['Empresa']}
-            - Status: {existing_record['Status da Entrada']}
-            - Veículo: {"Sim" if existing_record['Placa'] or existing_record['Marca do Carro'] else "Não"}
             """)
             
             # Tratamento especial para o campo CPF para preservar números longos
@@ -368,26 +324,18 @@ def vehicle_access_interface():
                     data_obj = datetime.strptime(data.strftime("%Y-%m-%d"), "%Y-%m-%d")
                     data_formatada = data_obj.strftime("%d/%m/%Y")
 
-                    # Obter o ID do registro existente
-                    existing_record_id = existing_record.iloc[0]  # O ID está na primeira coluna
-                    
-                    # Preparar dados atualizados
-                    updated_data = [
+                    success = add_record(
                         name_to_add_or_edit, 
                         cpf, 
                         placa, 
                         marca_carro, 
                         horario_entrada, 
-                        existing_record["Horário de Saída"],  # Manter o horário de saída existente sem alteração
                         data_formatada,
                         empresa, 
                         status, 
                         motivo, 
-                        aprovador,
-                        existing_record["Data do Primeiro Registro"] if "Data do Primeiro Registro" in existing_record else ""
-                    ]
-                    
-                    success = sheet_operations.editar_dados(existing_record_id, updated_data)
+                        aprovador
+                    )
                     if success:
                         st.success("Registro atualizado com sucesso!")
                         # Recarregar dados após a atualização
@@ -533,18 +481,7 @@ def vehicle_access_interface():
             else:
                 st.warning(f"Não há registros encontrados para o status {status_filter} e empresa {empresa_filter}.")
          
-    # Converter a coluna 'Data' para datetime para ordenação correta
-    df_display = st.session_state.df_acesso_veiculos.copy()
-    df_display['Data'] = pd.to_datetime(df_display['Data'], format='%d/%m/%Y', errors='coerce')
-    
-    # Ordenar por data (mais recente primeiro) e horário de entrada
-    df_display = df_display.sort_values(by=['Data', 'Horário de Entrada'], ascending=[False, False])
-    
-    # Converter a data de volta para o formato brasileiro
-    df_display['Data'] = df_display['Data'].dt.strftime('%d/%m/%Y')
-    
-    # Preencher valores nulos com string vazia e exibir o dataframe
-    st.dataframe(df_display.fillna(""), use_container_width=True)
+    st.dataframe(st.session_state.df_acesso_veiculos.fillna(""))
     
 
 def blocks():
@@ -565,6 +502,10 @@ def blocks():
         st.error("Registros Bloqueados:\n" + blocked_info)
     else:
         st.empty()
+
+
+
+
 
 
 
