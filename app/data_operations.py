@@ -170,15 +170,11 @@ def update_exit_time(name, exit_date, exit_time):
         if exit_datetime < entry_datetime:
             return False, "O horário de saída não pode ser anterior ao horário de entrada."
 
-
         if not columns: # Caso columns não tenha sido definido (improvável aqui, mas seguro)
             return False, "Nomes das colunas não carregados."
             
         try:
             horario_saida_col_index = columns.index("Horário de Saída")
-            # O ID é a primeira coluna (índice 0).
-            # A lista de dados para sheet_operations.editar_dados não deve incluir o ID.
-            # Então, o índice em 'updated_data' será 'horario_saida_col_index - 1'
             idx_horario_saida_in_updated_data = horario_saida_col_index -1
             
             # E os outros campos para o novo registro devem ser mapeados corretamente
@@ -287,8 +283,11 @@ def has_open_entry(name, data=None):
             ]
             
             if not same_day_records.empty:
-                record = same_day_records.iloc[0]
-                return True, record, f"Já existe um registro para {name} na data {data}. Não é possível ter múltiplas entradas no mesmo dia."
+                # Verificar se todos os registros do dia têm horário de saída
+                all_have_exit = same_day_records["Horário de Saída"].apply(is_valid_time).all()
+                if not all_have_exit:
+                    record = same_day_records.iloc[0]
+                    return True, record, f"Já existe um registro sem saída para {name} na data {data}. Por favor, registre a saída antes de criar uma nova entrada."
         
         return False, None, ""
         
@@ -436,20 +435,6 @@ def get_block_info(name):
     except Exception as e:
         st.error(f"Erro ao obter informações de bloqueio: {str(e)}")
         return None
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
