@@ -92,6 +92,22 @@ def round_to_nearest_interval(time_value, interval=1):
         now = datetime.now()
         return now.strftime("%H:%M")
 
+def is_valid_time(time_str):
+    """
+    Verifica se uma string representa um horário válido no formato HH:MM
+    """
+    if not time_str:  # Se for None ou string vazia
+        return False
+    try:
+        # Remove espaços e tenta converter para datetime
+        time_clean = str(time_str).strip()
+        if time_clean:
+            datetime.strptime(time_clean, "%H:%M")
+            return True
+        return False
+    except (ValueError, TypeError):
+        return False
+
 def update_exit_time(name, exit_date, exit_time):
     """
     Atualiza o horário de saída de um registro, lidando corretamente com registros que atravessam a meia-noite.
@@ -109,29 +125,33 @@ def update_exit_time(name, exit_date, exit_time):
         # Encontrar o registro em aberto mais recente para a pessoa
         person_records = df[
             (df["Nome"] == name) &
-            ((df["Horário de Saída"].isna()) | (df["Horário de Saída"] == ""))
-        ].copy() # Usar .copy() para evitar SettingWithCopyWarning
+            df["Horário de Saída"].apply(lambda x: not is_valid_time(x))
+        ].copy()
         
         if person_records.empty:
             return False, f"Nenhum registro em aberto encontrado para {name}."
         
-        # Ordenar por Data e Horário de Entrada para pegar o mais recente, caso haja múltiplos (embora a lógica de add_record deva prevenir isso)
-        # Primeiro, converter para datetime para ordenação correta, tratando erros
+        # Ordenar por Data e Horário de Entrada para pegar o mais recente
         try:
-            person_records["DataHoraEntrada"] = pd.to_datetime(person_records["Data"] + ' ' + person_records["Horário de Entrada"], format="%d/%m/%Y %H:%M", errors='coerce')
-            person_records.dropna(subset=["DataHoraEntrada"], inplace=True) # Remover registros com data/hora de entrada inválida
-            if person_records.empty: # Se todos os registros em aberto tinham data/hora inválida
-                 return False, f"Nenhum registro em aberto válido encontrado para {name} após verificação de data/hora."
+            person_records["DataHoraEntrada"] = pd.to_datetime(
+                person_records["Data"] + ' ' + person_records["Horário de Entrada"], 
+                format="%d/%m/%Y %H:%M", 
+                errors='coerce'
+            )
+            person_records.dropna(subset=["DataHoraEntrada"], inplace=True)
+            if person_records.empty:
+                return False, f"Nenhum registro em aberto válido encontrado para {name} após verificação de data/hora."
             person_records.sort_values(by="DataHoraEntrada", ascending=False, inplace=True)
         except Exception as e:
-            # Se houver erro na conversão ou ordenação, prosseguir com o primeiro encontrado, mas logar um aviso.
-            # Idealmente, os dados na planilha devem estar consistentes.
             st.warning(f"Erro ao processar datas para ordenação de registros em aberto para {name}: {e}. Usando o primeiro registro encontrado.")
 
-
         record_to_update = person_records.iloc[0]
-        record_id = record_to_update.iloc[0] # Assumindo que o ID é a primeira coluna da Series 'record_to_update'
-        
+        record_id = record_to_update.iloc[0]
+
+        # Validar o horário de saída fornecido
+        if not is_valid_time(exit_time):
+            return False, "O horário de saída fornecido não é válido. Use o formato HH:MM."
+
         # Converter datas e horários para datetime
         try:
             entry_date_str = record_to_update["Data"]
@@ -150,14 +170,7 @@ def update_exit_time(name, exit_date, exit_time):
         if exit_datetime < entry_datetime:
             return False, "O horário de saída não pode ser anterior ao horário de entrada."
 
-        # Prepara os dados para edição (excluindo o ID que não é editável diretamente pela função editar_dados)
-        # Os índices aqui devem corresponder à ordem das colunas na planilha APÓS a coluna ID
-        # Ex: Se a planilha é ID, Nome, CPF, ..., Horário de Saída (índice 5 das colunas originais)
-        # E 'record_to_update' é uma Series com todas essas colunas,
-        # record_to_update.tolist() [1:] pegaria todos os valores exceto o ID.
-        
-        # Vamos carregar as colunas novamente para garantir que os índices estão corretos
-        # e encontrar o índice da coluna "Horário de Saída"
+
         if not columns: # Caso columns não tenha sido definido (improvável aqui, mas seguro)
             return False, "Nomes das colunas não carregados."
             
@@ -256,10 +269,10 @@ def has_open_entry(name, data=None):
         sheet_operations = SheetOperations()
         df = pd.DataFrame(sheet_operations.carregar_dados()[1:], columns=sheet_operations.carregar_dados()[0])
         
-        # Verificar registros em aberto (sem horário de saída)
+        # Verificar registros em aberto (sem horário de saída válido)
         open_records = df[
             (df["Nome"] == name) &
-            ((df["Horário de Saída"].isna()) | (df["Horário de Saída"] == ""))
+            df["Horário de Saída"].apply(lambda x: not is_valid_time(x))
         ]
         
         if not open_records.empty:
@@ -423,6 +436,24 @@ def get_block_info(name):
     except Exception as e:
         st.error(f"Erro ao obter informações de bloqueio: {str(e)}")
         return None
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
