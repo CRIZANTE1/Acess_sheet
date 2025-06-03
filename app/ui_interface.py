@@ -324,18 +324,26 @@ def vehicle_access_interface():
                     data_obj = datetime.strptime(data.strftime("%Y-%m-%d"), "%Y-%m-%d")
                     data_formatada = data_obj.strftime("%d/%m/%Y")
 
-                    success = add_record(
+                    # Obter o ID do registro existente
+                    existing_record_id = existing_record[0]  # O ID está na primeira coluna
+                    
+                    # Preparar dados atualizados
+                    updated_data = [
                         name_to_add_or_edit, 
                         cpf, 
                         placa, 
                         marca_carro, 
                         horario_entrada, 
+                        existing_record["Horário de Saída"],  # Manter o horário de saída existente
                         data_formatada,
                         empresa, 
                         status, 
                         motivo, 
-                        aprovador
-                    )
+                        aprovador,
+                        existing_record["Data do Primeiro Registro"] if "Data do Primeiro Registro" in existing_record else ""
+                    ]
+                    
+                    success = sheet_operations.editar_dados(existing_record_id, updated_data)
                     if success:
                         st.success("Registro atualizado com sucesso!")
                         # Recarregar dados após a atualização
@@ -502,14 +510,6 @@ def blocks():
         st.error("Registros Bloqueados:\n" + blocked_info)
     else:
         st.empty()
-
-
-
-
-
-
-
-
 
 
 
