@@ -3,6 +3,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 from app.operations import SheetOperations
 
+
 def generate_time_options():
     times = []
     start_time = datetime.strptime("00:00", "%H:%M")
@@ -111,7 +112,7 @@ def update_exit_time(name, exit_date, exit_time):
         
         # Pegar o registro mais recente (assumindo que a data está no formato dd/mm/yyyy)
         record = person_records.iloc[0]
-        record_id = record.iloc[0]  # ID do registro
+        record_id = record[0]  # ID do registro
         
         # Converter datas e horários para datetime
         entry_date = datetime.strptime(record["Data"], "%d/%m/%Y")
@@ -126,7 +127,7 @@ def update_exit_time(name, exit_date, exit_time):
         # Se a saída é no mesmo dia da entrada
         if entry_date.date() == exit_date_obj.date():
             # Atualizar o registro com o horário de saída
-            updated_data = [record.iloc[i] for i in range(1, len(record))]  # Excluir o ID usando iloc
+            updated_data = list(record[1:])  # Excluir o ID
             updated_data[5] = exit_time  # Índice 5 é o Horário de Saída
             sheet_operations.editar_dados(record_id, updated_data)
             return True, "Horário de saída atualizado com sucesso."
@@ -134,7 +135,7 @@ def update_exit_time(name, exit_date, exit_time):
         # Se a saída é em um dia diferente
         else:
             # 1. Fechar o registro do dia anterior às 23:59
-            updated_data = [record.iloc[i] for i in range(1, len(record))]  # Excluir o ID usando iloc
+            updated_data = list(record[1:])
             updated_data[5] = "23:59"  # Horário de Saída
             sheet_operations.editar_dados(record_id, updated_data)
             
@@ -180,60 +181,18 @@ def update_exit_time(name, exit_date, exit_time):
     except Exception as e:
         return False, f"Erro ao atualizar horário de saída: {str(e)}"
 
-def check_duplicate_entry(name, data, horario_entrada):
-    """
-    Verifica se já existe um registro para a pessoa na mesma data e horário.
-    """
-    try:
-        sheet_operations = SheetOperations()
-        df = pd.DataFrame(sheet_operations.carregar_dados()[1:], columns=sheet_operations.carregar_dados()[0])
-        
-        duplicates = df[
-            (df["Nome"] == name) & 
-            (df["Data"] == data) & 
-            (df["Horário de Entrada"] == horario_entrada)
-        ]
-        
-        return not duplicates.empty
-        
-    except Exception as e:
-        st.error(f"Erro ao verificar registros duplicados: {str(e)}")
-        return False
-
 def add_record(name, cpf, placa, marca_carro, horario_entrada, data, empresa, status, motivo, aprovador):
     """
     Adiciona um novo registro de acesso.
     """
     try:
-        # Verifica se já existe um registro duplicado
-        if check_duplicate_entry(name, data, horario_entrada):
-            st.warning("Já existe um registro para esta pessoa nesta data e horário.")
-            return False
-            
         sheet_operations = SheetOperations()
-        # Garantir que o horário de saída seja explicitamente vazio
         new_data = [
-            name,           # Nome
-            cpf,           # CPF
-            placa,         # Placa
-            marca_carro,   # Marca do Carro
-            horario_entrada,# Horário de Entrada
-            "",           # Horário de Saída (sempre vazio para novos registros)
-            data,          # Data
-            empresa,       # Empresa
-            status,        # Status
-            motivo,        # Motivo do Bloqueio
-            aprovador,     # Aprovador
-            data if not motivo else ""  # Data do Primeiro Registro
+            name, cpf, placa, marca_carro, horario_entrada, "", data, empresa, 
+            status, motivo, aprovador, data if not motivo else ""
         ]
-        
-        # Verificar se todos os campos estão corretos antes de adicionar
-        if len(new_data) != 12:  # Número total de colunas esperado
-            st.error("Erro na estrutura dos dados. Por favor, verifique todos os campos.")
-            return False
-            
-        success = sheet_operations.adc_dados(new_data)
-        return success
+        sheet_operations.adc_dados(new_data)
+        return True
     except Exception as e:
         st.error(f"Erro ao adicionar registro: {str(e)}")
         return False
@@ -252,7 +211,7 @@ def delete_record(name, data):
         if record.empty:
             return False
             
-        record_id = record.iloc[0].iloc[0]  # ID está na primeira coluna, usando iloc duas vezes
+        record_id = record.iloc[0][0]  # ID está na primeira coluna
         return sheet_operations.excluir_dados(record_id)
         
     except Exception as e:
@@ -325,7 +284,6 @@ def get_block_info(name):
     except Exception as e:
         st.error(f"Erro ao obter informações de bloqueio: {str(e)}")
         return None
-
 
 
 
