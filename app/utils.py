@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 import pandas as pd
+import streamlit as st
 
 def generate_time_options():
     """Gera uma lista de horários de 00:00 a 23:59 em intervalos de 1 minuto"""
@@ -22,46 +23,73 @@ def format_cpf(cpf):
         return cpf
     return f"{cpf[:3]}.{cpf[3:6]}.{cpf[6:9]}-{cpf[9:]}"
 
-def validate_cpf(cpf):
+def validate_cpf(cpf, debug=True):
     """Valida o CPF"""
-    # Remove caracteres não numéricos e espaços
-    cpf = ''.join(filter(str.isdigit, str(cpf)))
-    
-    # Verifica se tem 11 dígitos
-    if len(cpf) != 11:
+    try:
+        # Remove caracteres não numéricos e espaços
+        cpf = ''.join(filter(str.isdigit, str(cpf)))
+        
+        # Verifica se tem 11 dígitos
+        if len(cpf) != 11:
+            if debug:
+                st.warning(f"CPF deve ter 11 dígitos. Encontrado: {len(cpf)}")
+            return False
+        
+        # Verifica se todos os dígitos são iguais
+        if len(set(cpf)) == 1:
+            if debug:
+                st.warning("CPF não pode ter todos os dígitos iguais")
+            return False
+        
+        # Lista com os dígitos do CPF
+        numeros = [int(digito) for digito in cpf]
+        
+        # Validação do primeiro dígito verificador
+        soma = sum(a * b for a, b in zip(numeros[0:9], range(10, 1, -1)))
+        digito1 = (soma * 10 % 11) % 10
+        
+        if numeros[9] != digito1:
+            if debug:
+                st.warning(f"Primeiro dígito verificador incorreto. Calculado: {digito1}, Encontrado: {numeros[9]}")
+            return False
+            
+        # Validação do segundo dígito verificador
+        soma = sum(a * b for a, b in zip(numeros[0:10], range(11, 1, -1)))
+        digito2 = (soma * 10 % 11) % 10
+        
+        if numeros[10] != digito2:
+            if debug:
+                st.warning(f"Segundo dígito verificador incorreto. Calculado: {digito2}, Encontrado: {numeros[10]}")
+            return False
+            
+        return True
+        
+    except Exception as e:
+        if debug:
+            st.error(f"Erro ao validar CPF: {str(e)}")
         return False
+
+def test_cpf(cpf_to_test):
+    """Função para testar a validação de CPF"""
+    cpf_limpo = ''.join(filter(str.isdigit, str(cpf_to_test)))
+    numeros = [int(digito) for digito in cpf_limpo]
     
-    # Verifica se todos os dígitos são iguais
-    if len(set(cpf)) == 1:
-        return False
+    # Calcula primeiro dígito
+    soma = sum(a * b for a, b in zip(numeros[0:9], range(10, 1, -1)))
+    d1 = (soma * 10 % 11) % 10
     
-    # Validação do primeiro dígito verificador
-    soma = 0
-    peso = 10
-    for i in range(9):
-        soma += int(cpf[i]) * peso
-        peso -= 1
+    # Calcula segundo dígito
+    soma = sum(a * b for a, b in zip(numeros[0:10], range(11, 1, -1)))
+    d2 = (soma * 10 % 11) % 10
     
-    resto = soma % 11
-    digito1 = 0 if resto < 2 else 11 - resto
+    st.write(f"""
+    CPF testado: {cpf_to_test}
+    CPF limpo: {cpf_limpo}
+    Dígitos calculados: {d1} e {d2}
+    Dígitos no CPF: {cpf_limpo[9:] if len(cpf_limpo) >= 11 else 'CPF incompleto'}
+    """)
     
-    if digito1 != int(cpf[9]):
-        return False
-    
-    # Validação do segundo dígito verificador
-    soma = 0
-    peso = 11
-    for i in range(10):
-        soma += int(cpf[i]) * peso
-        peso -= 1
-    
-    resto = soma % 11
-    digito2 = 0 if resto < 2 else 11 - resto
-    
-    if digito2 != int(cpf[10]):
-        return False
-    
-    return True
+    return validate_cpf(cpf_to_test)
 
 def round_to_nearest_interval(time_value, interval=1):
     """Arredonda o horário para o intervalo mais próximo"""
