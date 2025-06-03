@@ -180,11 +180,36 @@ def update_exit_time(name, exit_date, exit_time):
     except Exception as e:
         return False, f"Erro ao atualizar horário de saída: {str(e)}"
 
+def check_duplicate_entry(name, data, horario_entrada):
+    """
+    Verifica se já existe um registro para a pessoa na mesma data e horário.
+    """
+    try:
+        sheet_operations = SheetOperations()
+        df = pd.DataFrame(sheet_operations.carregar_dados()[1:], columns=sheet_operations.carregar_dados()[0])
+        
+        duplicates = df[
+            (df["Nome"] == name) & 
+            (df["Data"] == data) & 
+            (df["Horário de Entrada"] == horario_entrada)
+        ]
+        
+        return not duplicates.empty
+        
+    except Exception as e:
+        st.error(f"Erro ao verificar registros duplicados: {str(e)}")
+        return False
+
 def add_record(name, cpf, placa, marca_carro, horario_entrada, data, empresa, status, motivo, aprovador):
     """
     Adiciona um novo registro de acesso.
     """
     try:
+        # Verifica se já existe um registro duplicado
+        if check_duplicate_entry(name, data, horario_entrada):
+            st.warning("Já existe um registro para esta pessoa nesta data e horário.")
+            return False
+            
         sheet_operations = SheetOperations()
         new_data = [
             name, cpf, placa, marca_carro, horario_entrada, "", data, empresa, 
@@ -283,7 +308,6 @@ def get_block_info(name):
     except Exception as e:
         st.error(f"Erro ao obter informações de bloqueio: {str(e)}")
         return None
-
 
 
 
