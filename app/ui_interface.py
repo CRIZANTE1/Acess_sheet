@@ -489,7 +489,18 @@ def vehicle_access_interface():
             else:
                 st.warning(f"Não há registros encontrados para o status {status_filter} e empresa {empresa_filter}.")
          
-    st.dataframe(st.session_state.df_acesso_veiculos.fillna(""))
+    # Converter a coluna 'Data' para datetime para ordenação correta
+    df_display = st.session_state.df_acesso_veiculos.copy()
+    df_display['Data'] = pd.to_datetime(df_display['Data'], format='%d/%m/%Y', errors='coerce')
+    
+    # Ordenar por data (mais recente primeiro) e horário de entrada
+    df_display = df_display.sort_values(by=['Data', 'Horário de Entrada'], ascending=[False, False])
+    
+    # Converter a data de volta para o formato brasileiro
+    df_display['Data'] = df_display['Data'].dt.strftime('%d/%m/%Y')
+    
+    # Preencher valores nulos com string vazia e exibir o dataframe
+    st.dataframe(df_display.fillna(""), use_container_width=True)
     
 
 def blocks():
@@ -510,6 +521,8 @@ def blocks():
         st.error("Registros Bloqueados:\n" + blocked_info)
     else:
         st.empty()
+
+
 
 
 
