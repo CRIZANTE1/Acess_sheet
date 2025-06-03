@@ -325,11 +325,25 @@ def vehicle_access_interface():
                     data_formatada = data_obj.strftime("%d/%m/%Y")
 
                     # Se o registro atual tem horário de saída, não permitir alterações
-                    # Verifica se o campo não é None, não é NaN (pelo fillna, seria ""), e se, após remover espaços, não é uma string vazia.
                     horario_saida_existente = existing_record["Horário de Saída"]
-                    if horario_saida_existente is not None and str(horario_saida_existente).strip() != "":
+                    # Verifica se o horário de saída é válido e não vazio
+                    tem_saida = False
+                    if horario_saida_existente is not None:
+                        # Remove espaços em branco e verifica se não é vazio
+                        horario_limpo = str(horario_saida_existente).strip()
+                        if horario_limpo:
+                            try:
+                                # Tenta converter para datetime para validar se é um horário válido
+                                datetime.strptime(horario_limpo, "%H:%M")
+                                tem_saida = True
+                            except ValueError:
+                                # Se não conseguir converter, não é um horário válido
+                                tem_saida = False
+
+                    if tem_saida:
                         st.error("Não é possível editar um registro que já tem horário de saída registrado. Se necessário, delete o registro e crie um novo.")
                         return
+
                     success, message = add_record(
                         name_to_add_or_edit, 
                         cpf, 
