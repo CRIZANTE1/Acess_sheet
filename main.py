@@ -4,9 +4,8 @@ from app.ui_interface import vehicle_access_interface
 from app.admin_page import admin_page
 from app.summary_page import summary_page 
 from auth.login_page import show_login_page, show_user_header, show_logout_button
-from auth.auth_utils import is_user_logged_in, is_admin
-from app.operations import SheetOperations
-from app.data_operations import get_cached_sheet_data, load_data_from_sheets
+from auth.auth_utils import is_user_logged_in, get_user_display_name, is_admin
+from app.data_operations import load_data_from_sheets
 
 st.set_page_config(page_title="Controle de Acesso BAERI", layout="wide")
 
@@ -46,6 +45,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
