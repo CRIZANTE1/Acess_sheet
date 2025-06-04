@@ -1,16 +1,9 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
-from app.data_operations import (
-    add_record, update_exit_time, delete_record, check_entry, 
-    check_blocked_records, get_block_info, get_cached_sheet_data
-)
+from app.data_operations import add_record, update_exit_time, delete_record, check_entry, check_blocked_records, get_block_info
 from app.operations import SheetOperations
 from app.utils import generate_time_options, format_cpf, validate_cpf, test_cpf, round_to_nearest_interval
-import logging
-
-# Configuração de logging
-logger = logging.getLogger(__name__)
 
 def vehicle_access_interface():
     st.title("Controle de Acesso BAERI")
@@ -34,42 +27,31 @@ def vehicle_access_interface():
 
     blocks()
     
-    try:
-        # Usar o sistema de cache para carregar os dados
-        logger.info("Carregando dados do cache...")
-        data_from_sheet = get_cached_sheet_data()
+    # Recarregar os dados do Google Sheets para garantir que estão atualizados
+    data_from_sheet = sheet_operations.carregar_dados()
+    if data_from_sheet:
+        # Use the actual headers from the sheet
+        columns = data_from_sheet[0]
+        df_temp = pd.DataFrame(data_from_sheet[1:], columns=columns)
         
-        if data_from_sheet:
-            logger.info("Dados obtidos do cache com sucesso")
-            # Use the actual headers from the sheet
-            columns = data_from_sheet[0]
-            df_temp = pd.DataFrame(data_from_sheet[1:], columns=columns)
-            
-            # Garantir que valores nulos ou vazios sejam tratados corretamente
-            df_temp = df_temp.fillna("")
-            
-            # Converter a coluna de data para datetime para ordenação correta
-            df_temp['Data_Ordenacao'] = pd.to_datetime(df_temp['Data'], format='%d/%m/%Y', errors='coerce')
-            
-            # Ordenar por data (mais recente primeiro) e horário de entrada
-            df_temp = df_temp.sort_values(by=['Data_Ordenacao', 'Horário de Entrada'], ascending=[False, False])
-            
-            # Remover a coluna auxiliar de ordenação
-            df_temp = df_temp.drop('Data_Ordenacao', axis=1)
-            
-            st.session_state.df_acesso_veiculos = df_temp
-            logger.info(f"DataFrame atualizado com {len(df_temp)} registros")
-        else:
-            logger.warning("Nenhum dado obtido do cache")
-            st.session_state.df_acesso_veiculos = pd.DataFrame(columns=[
-                "Nome", "CPF", "Placa", "Marca do Carro", "Horário de Entrada",
-                "Horário de Saída", "Data", "Empresa", "Status da Entrada", "Motivo do Bloqueio", 
-                "Aprovador", "Data do Primeiro Registro"
-            ])
-            st.warning("Não foi possível carregar os dados. Usando DataFrame vazio.")
-    except Exception as e:
-        logger.error(f"Erro ao carregar dados: {str(e)}")
-        st.error(f"Erro ao carregar dados: {str(e)}")
+        # Garantir que valores nulos ou vazios sejam tratados corretamente
+        df_temp = df_temp.fillna("")
+        
+        # Converter a coluna de data para datetime para ordenação correta
+        df_temp['Data_Ordenacao'] = pd.to_datetime(df_temp['Data'], format='%d/%m/%Y', errors='coerce')
+        
+        # Ordenar por data (mais recente primeiro) e horário de entrada
+        df_temp = df_temp.sort_values(by=['Data_Ordenacao', 'Horário de Entrada'], ascending=[False, False])
+        
+        # Remover a coluna auxiliar de ordenação
+        df_temp = df_temp.drop('Data_Ordenacao', axis=1)
+        
+        st.session_state.df_acesso_veiculos = df_temp
+    else:
+        st.session_state.df_acesso_veiculos = pd.DataFrame(columns=[
+            "Nome", "CPF", "Placa", "Marca do Carro", "Horário de Entrada",
+            "Horário de Saída", "Data", "Empresa", "Status da Entrada", "Motivo do Bloqueio", "Aprovador", "Data do Primeiro Registro"
+        ])
 
     # Adicionar ou editar registro
     with st.expander("Adicionar ou Editar Registro", expanded=True):
@@ -144,14 +126,8 @@ def vehicle_access_interface():
                     )
                     if success:
                         st.success("Registro adicionado com sucesso!")
-                        # Recarregar dados usando o cache
-                        data = get_cached_sheet_data(force_refresh=True)
-                        if data:
-                            columns = data[0]
-                            df_temp = pd.DataFrame(data[1:], columns=columns)
-                            df_temp = df_temp.fillna("")
-                            st.session_state.df_acesso_veiculos = df_temp
-                            logger.info("DataFrame atualizado após adicionar registro")
+                        # Recarregar dados após a adição
+                        st.session_state.df_acesso_veiculos = pd.DataFrame(sheet_operations.carregar_dados()[1:], columns=sheet_operations.carregar_dados()[0])
                         st.rerun()
                     else:
                         st.error("Falha ao adicionar registro.")
@@ -448,9 +424,6 @@ def blocks():
         st.error("Registros Bloqueados:\n" + blocked_info)
     else:
         st.empty()
-
-
-
 
 
 
