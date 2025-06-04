@@ -286,6 +286,20 @@ def get_block_info(name):
         return None
 
 
+def load_data_from_sheets():
+    # Forçar atualização dos dados
+    sheet_operations = SheetOperations()
+    data = sheet_operations.carregar_dados()
+    if data:
+        columns = data[0]
+        df = pd.DataFrame(data[1:], columns=columns)
+        st.session_state.df_acesso_veiculos = df
+    else:
+        st.session_state.df_acesso_veiculos = pd.DataFrame(columns=[
+        "ID", "Nome", "CPF", "Placa", "Marca do Carro", "Horário de Entrada", "Horário de Saída", 
+        "Data", "Empresa", "Status da Entrada", "Motivo do Bloqueio", "Aprovador", "Data do Primeiro Registro"
+    ])
+
 
 
 
