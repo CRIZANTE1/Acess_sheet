@@ -110,9 +110,9 @@ def update_exit_time(name, exit_date, exit_time):
         if person_records.empty:
             return False, "Nenhum registro em aberto encontrado para esta pessoa."
         
-        # Pegar o registro mais recente (assumindo que a data está no formato dd/mm/yyyy)
+        # Pegar o registro mais recente (usando .iloc para indexação posicional)
         record = person_records.iloc[0]
-        record_id = record[0]  # ID do registro
+        record_id = record.iloc[0]  # ID do registro usando .iloc
         
         # Converter datas e horários para datetime
         entry_date = datetime.strptime(record["Data"], "%d/%m/%Y")
@@ -127,7 +127,7 @@ def update_exit_time(name, exit_date, exit_time):
         # Se a saída é no mesmo dia da entrada
         if entry_date.date() == exit_date_obj.date():
             # Atualizar o registro com o horário de saída
-            updated_data = list(record[1:])  # Excluir o ID
+            updated_data = list(record.iloc[1:])  # Excluir o ID usando .iloc
             updated_data[5] = exit_time  # Índice 5 é o Horário de Saída
             sheet_operations.editar_dados(record_id, updated_data)
             return True, "Horário de saída atualizado com sucesso."
@@ -135,7 +135,7 @@ def update_exit_time(name, exit_date, exit_time):
         # Se a saída é em um dia diferente
         else:
             # 1. Fechar o registro do dia anterior às 23:59
-            updated_data = list(record[1:])
+            updated_data = list(record.iloc[1:])
             updated_data[5] = "23:59"  # Horário de Saída
             sheet_operations.editar_dados(record_id, updated_data)
             
@@ -299,27 +299,6 @@ def load_data_from_sheets():
         "ID", "Nome", "CPF", "Placa", "Marca do Carro", "Horário de Entrada", "Horário de Saída", 
         "Data", "Empresa", "Status da Entrada", "Motivo do Bloqueio", "Aprovador", "Data do Primeiro Registro"
     ])
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
