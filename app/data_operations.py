@@ -1,53 +1,8 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
-import time
-from functools import wraps
 from app.operations import SheetOperations
 
-# Cache para armazenar os dados
-_sheet_data_cache = {
-    'data': None,
-    'last_update': None
-}
-
-# Decorator para implementar throttling
-def throttle_requests(min_time=1):
-    """Decorator para garantir um intervalo mínimo entre chamadas"""
-    last_call = {}
-    
-    def decorator(func):
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            now = time.time()
-            if func.__name__ in last_call:
-                time_since_last_call = now - last_call[func.__name__]
-                if time_since_last_call < min_time:
-                    time.sleep(min_time - time_since_last_call)
-            result = func(*args, **kwargs)
-            last_call[func.__name__] = time.time()
-            return result
-        return wrapper
-    return decorator
-
-# Função para obter dados com cache
-def get_cached_sheet_data(force_refresh=False):
-    """Obtém dados do cache ou atualiza se necessário"""
-    now = datetime.now()
-    cache_age = (now - _sheet_data_cache['last_update']).total_seconds() if _sheet_data_cache['last_update'] else None
-    
-    if force_refresh or not _sheet_data_cache['data'] or not cache_age or cache_age > 60:  # Cache de 1 minuto
-        try:
-            sheet_operations = SheetOperations()
-            data = sheet_operations.carregar_dados()
-            _sheet_data_cache['data'] = data
-            _sheet_data_cache['last_update'] = now
-        except Exception as e:
-            if not _sheet_data_cache['data']:
-                raise e
-            st.warning("Usando dados em cache devido a erro de conexão")
-    
-    return _sheet_data_cache['data']
 
 def generate_time_options():
     times = []
@@ -143,11 +98,10 @@ def update_exit_time(name, exit_date, exit_time):
     Atualiza o horário de saída de um registro, lidando corretamente com registros que atravessam a meia-noite.
     """
     try:
-        data = get_cached_sheet_data()
-        if not data:
-            return False, "Erro ao carregar dados"
-            
-        df = pd.DataFrame(data[1:], columns=data[0])
+        sheet_operations = SheetOperations()
+        df = pd.DataFrame(sheet_operations.carregar_dados()[1:], columns=sheet_operations.carregar_dados()[0])
+        
+        # Encontrar o registro em aberto mais recente para a pessoa
         person_records = df[
             (df["Nome"] == name) &
             ((df["Horário de Saída"].isna()) | (df["Horário de Saída"] == ""))
@@ -156,9 +110,9 @@ def update_exit_time(name, exit_date, exit_time):
         if person_records.empty:
             return False, "Nenhum registro em aberto encontrado para esta pessoa."
         
-        # Pegar o registro mais recente
+        # Pegar o registro mais recente (assumindo que a data está no formato dd/mm/yyyy)
         record = person_records.iloc[0]
-        record_id = record.iloc[0]  # ID do registro usando .iloc
+        record_id = record[0]  # ID do registro
         
         # Converter datas e horários para datetime
         entry_date = datetime.strptime(record["Data"], "%d/%m/%Y")
@@ -175,7 +129,6 @@ def update_exit_time(name, exit_date, exit_time):
             # Atualizar o registro com o horário de saída
             updated_data = list(record[1:])  # Excluir o ID
             updated_data[5] = exit_time  # Índice 5 é o Horário de Saída
-            sheet_operations = SheetOperations()
             sheet_operations.editar_dados(record_id, updated_data)
             return True, "Horário de saída atualizado com sucesso."
         
@@ -184,7 +137,6 @@ def update_exit_time(name, exit_date, exit_time):
             # 1. Fechar o registro do dia anterior às 23:59
             updated_data = list(record[1:])
             updated_data[5] = "23:59"  # Horário de Saída
-            sheet_operations = SheetOperations()
             sheet_operations.editar_dados(record_id, updated_data)
             
             # 2. Criar registros para os dias intermediários (se houver)
@@ -240,8 +192,6 @@ def add_record(name, cpf, placa, marca_carro, horario_entrada, data, empresa, st
             status, motivo, aprovador, data if not motivo else ""
         ]
         sheet_operations.adc_dados(new_data)
-        # Força atualização do cache após adicionar novo registro
-        get_cached_sheet_data(force_refresh=True)
         return True
     except Exception as e:
         st.error(f"Erro ao adicionar registro: {str(e)}")
@@ -252,11 +202,8 @@ def delete_record(name, data):
     Deleta um registro de acesso.
     """
     try:
-        sheet_data = get_cached_sheet_data()
-        if not sheet_data:
-            return False
-            
-        df = pd.DataFrame(sheet_data[1:], columns=sheet_data[0])
+        sheet_operations = SheetOperations()
+        df = pd.DataFrame(sheet_operations.carregar_dados()[1:], columns=sheet_operations.carregar_dados()[0])
         
         # Encontrar o registro para deletar
         record = df[(df["Nome"] == name) & (df["Data"] == data)]
@@ -264,13 +211,8 @@ def delete_record(name, data):
         if record.empty:
             return False
             
-        record_id = record.iloc[0].iloc[0]  # ID está na primeira coluna usando .iloc
-        sheet_operations = SheetOperations()
-        success = sheet_operations.excluir_dados(record_id)
-        if success:
-            # Força atualização do cache após deletar registro
-            get_cached_sheet_data(force_refresh=True)
-        return success
+        record_id = record.iloc[0][0]  # ID está na primeira coluna
+        return sheet_operations.excluir_dados(record_id)
         
     except Exception as e:
         st.error(f"Erro ao deletar registro: {str(e)}")
@@ -281,11 +223,8 @@ def check_entry(name, data):
     Verifica um registro de entrada.
     """
     try:
-        sheet_data = get_cached_sheet_data()
-        if not sheet_data:
-            return None, "Erro ao carregar dados"
-            
-        df = pd.DataFrame(sheet_data[1:], columns=sheet_data[0])
+        sheet_operations = SheetOperations()
+        df = pd.DataFrame(sheet_operations.carregar_dados()[1:], columns=sheet_operations.carregar_dados()[0])
         
         if data:
             record = df[(df["Nome"] == name) & (df["Data"] == data)]
@@ -328,11 +267,8 @@ def get_block_info(name):
     Obtém informações de bloqueio de uma pessoa.
     """
     try:
-        sheet_data = get_cached_sheet_data()
-        if not sheet_data:
-            return None
-            
-        df = pd.DataFrame(sheet_data[1:], columns=sheet_data[0])
+        sheet_operations = SheetOperations()
+        df = pd.DataFrame(sheet_operations.carregar_dados()[1:], columns=sheet_operations.carregar_dados()[0])
         
         blocked = df[(df["Nome"] == name) & (df["Status da Entrada"] == "Bloqueado")]
         if blocked.empty:
@@ -349,21 +285,7 @@ def get_block_info(name):
         st.error(f"Erro ao obter informações de bloqueio: {str(e)}")
         return None
 
-def load_data_from_sheets():
-    """
-    Carrega os dados da planilha para o estado da sessão do Streamlit.
-    Utiliza o sistema de cache para evitar requisições excessivas.
-    """
-    data = get_cached_sheet_data()
-    if data:
-        columns = data[0]
-        df = pd.DataFrame(data[1:], columns=columns)
-        st.session_state.df_acesso_veiculos = df
-    else:
-        st.session_state.df_acesso_veiculos = pd.DataFrame(columns=[
-            "ID", "Nome", "CPF", "Placa", "Marca do Carro", "Horário de Entrada", "Horário de Saída", 
-            "Data", "Empresa", "Status da Entrada", "Motivo do Bloqueio", "Aprovador", "Data do Primeiro Registro"
-        ])
+
 
 
 
