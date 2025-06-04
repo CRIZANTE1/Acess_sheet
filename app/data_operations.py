@@ -211,7 +211,7 @@ def delete_record(name, data):
         if record.empty:
             return False
             
-        record_id = record.iloc[0][0]  # ID está na primeira coluna
+        record_id = record.iloc[0].iloc[0]  # ID está na primeira coluna
         return sheet_operations.excluir_dados(record_id)
         
     except Exception as e:
@@ -299,7 +299,6 @@ def load_data_from_sheets():
         "ID", "Nome", "CPF", "Placa", "Marca do Carro", "Horário de Entrada", "Horário de Saída", 
         "Data", "Empresa", "Status da Entrada", "Motivo do Bloqueio", "Aprovador", "Data do Primeiro Registro"
     ])
-
 
 
 
