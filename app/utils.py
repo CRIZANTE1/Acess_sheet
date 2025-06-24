@@ -14,12 +14,10 @@ def generate_time_options():
     times = []
     start_time = datetime.strptime("00:00", "%H:%M")
     end_time = datetime.strptime("23:59", "%H:%M")
-
     current_time = start_time
     while current_time <= end_time:
         times.append(current_time.strftime("%H:%M"))
         current_time += timedelta(minutes=1)
-    
     return times
 
 def format_cpf(cpf):
@@ -35,13 +33,11 @@ def validate_cpf(cpf):
     if len(cpf) != 11 or len(set(cpf)) == 1:
         return False
     
-    # Validação do primeiro dígito
     soma = sum(int(cpf[i]) * (10 - i) for i in range(9))
     resto = (soma * 10) % 11
     if resto == 10: resto = 0
     if resto != int(cpf[9]): return False
     
-    # Validação do segundo dígito
     soma = sum(int(cpf[i]) * (11 - i) for i in range(10))
     resto = (soma * 10) % 11
     if resto == 10: resto = 0
@@ -49,25 +45,24 @@ def validate_cpf(cpf):
     
     return True
 
+def test_cpf(cpf_to_test):
+    """Função para testar a validação de CPF no Streamlit"""
+    is_valid = validate_cpf(cpf_to_test)
+    st.write(f"CPF '{cpf_to_test}' é {'Válido' if is_valid else 'Inválido'}.")
+    return is_valid
+
 def round_to_nearest_interval(time_value, interval=1):
     """Arredonda o horário para o intervalo mais próximo"""
     try:
         if pd.isna(time_value) or time_value == "":
-            # Usa o horário de São Paulo como fallback
             now = get_sao_paulo_time()
             return now.strftime("%H:%M")
         
-        time_str = str(time_value)
-        time_obj = datetime.strptime(time_str, "%H:%M")
-        
+        time_obj = datetime.strptime(str(time_value), "%H:%M")
         total_minutes = time_obj.hour * 60 + time_obj.minute
         rounded_minutes = (total_minutes // interval) * interval
-        
-        hours = rounded_minutes // 60
-        minutes = rounded_minutes % 60
-        
+        hours, minutes = divmod(rounded_minutes, 60)
         return f"{hours:02d}:{minutes:02d}"
     except Exception:
-        # Usa o horário de São Paulo como fallback em caso de erro
         now = get_sao_paulo_time()
-        return now.strftime("%H:%M") 
+        return now.strftime("%H:%M")
