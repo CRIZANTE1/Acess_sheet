@@ -8,3 +8,4 @@ Authlib
 pygsheets
 fuzzywuzzy
 python-Levenshtein
+unidecode
