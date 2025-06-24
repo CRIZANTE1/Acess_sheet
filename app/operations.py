@@ -1,198 +1,120 @@
+# app/operations.py
+
 import streamlit as st
 import pandas as pd
 import logging
 import random
-from app.sheets_api import connect_sheet
-
+import os
+import json
+import pygsheets # Importa pygsheets aqui
 
 class SheetOperations:
     
     def __init__(self):
         """
-        O código define uma classe com métodos para conectar-se a um documento Google Sheets, carregar dados de
-        uma planilha específica, adicionar novos dados com um ID único, editar dados existentes com base no ID
-        e excluir dados com base no ID.
+        A classe agora é responsável por sua própria conexão.
+        A lógica de 'connect_sheet' foi movida para cá.
         """
-        self.credentials, self.my_archive_google_sheets = connect_sheet()
-        if not self.credentials or not self.my_archive_google_sheets:
-            logging.error("Credenciais ou URL do Google Sheets inválidos.")
+        try:
+            logging.info("SheetOperations: Tentando conectar ao Google Sheets...")
 
+            # Lógica de conexão do Streamlit Secrets
+            if "connections" in st.secrets and "gsheets" in st.secrets["connections"]:
+                service_account_info = dict(st.secrets["connections"]["gsheets"])
+                spreadsheet_url = service_account_info.pop("spreadsheet")
+                json_credentials = json.dumps(service_account_info)
+                os.environ["GCP_SERVICE_ACCOUNT"] = json_credentials
+                self.credentials = pygsheets.authorize(service_account_env_var="GCP_SERVICE_ACCOUNT")
+                self.my_archive_google_sheets = spreadsheet_url
+            
+            # Lógica de conexão local (fallback)
+            else:
+                credentials_path = os.path.join(os.path.dirname(__file__), 'credentials', 'cred.json')
+                self.credentials = pygsheets.authorize(service_file=credentials_path)
+                self.my_archive_google_sheets = "https://docs.google.com/spreadsheets/d/1sZ6PMTRTTyYekggsA4XWAJAn39XCVsDfpqXwrwMTXP8/edit?gid=0#gid=0"
+
+            logging.info("SheetOperations: Conexão bem sucedida.")
+
+        except Exception as e:
+            logging.error(f"SheetOperations: Erro durante a autorização: {e}")
+            st.error(f"Erro crítico ao conectar com o Google Sheets: {e}")
+            self.credentials = None
+            self.my_archive_google_sheets = None
+    
     def carregar_dados(self):
         return self.carregar_dados_aba('acess')
     
     def carregar_dados_funcionarios(self):
-        """
-        Carrega os dados dos funcionários da aba 'funcionarios' do Google Sheets.
-        
-        Returns:
-            list: Lista com os dados dos funcionários, onde o primeiro item são os cabeçalhos
-                 e os demais são os dados de cada funcionário.
-        """
         return self.carregar_dados_aba('funcionarios')
 
     def carregar_dados_aprovadores(self):
-        """
-        Carrega os dados dos aprovadores da aba 'authorizer' do Google Sheets.
-        
-        Returns:
-            list: Lista com os nomes dos aprovadores autorizados.
-        """
         dados = self.carregar_dados_aba('authorizer')
-        if dados and len(dados) > 1:  # Verifica se há dados além do cabeçalho
-            # Assume que a primeira coluna contém os nomes dos aprovadores
-            return [row[0] for row in dados[1:] if row[0].strip()]  # Retorna apenas nomes não vazios
+        if dados and len(dados) > 1:
+            return [row[0] for row in dados[1:] if row and row[0].strip()]
         return []
 
     def carregar_dados_aba(self, aba_name):
         if not self.credentials or not self.my_archive_google_sheets:
+            st.error("Conexão com Google Sheets não configurada.")
             return None
         try:
-            logging.info(f"Tentando ler dados da aba '{aba_name}'...")
-            
             archive = self.credentials.open_by_url(self.my_archive_google_sheets)
-            
-            if aba_name not in [sheet.title for sheet in archive.worksheets()]:
-                logging.error(f"A aba '{aba_name}' não existe no Google Sheets.")
-                st.error(f"A aba '{aba_name}' não foi encontrada na planilha.")
-                return None
-            
             aba = archive.worksheet_by_title(aba_name)
-            data = aba.get_all_values()
-            
-            if not data:
-                logging.warning(f"A aba '{aba_name}' está vazia.")
-                return []
-
-            # Identificar colunas com nomes não vazios na primeira linha (cabeçalhos)
-            header = data[0]
-            valid_columns_indices = [i for i, col_name in enumerate(header) if col_name.strip()]
-            
-            if not valid_columns_indices:
-                logging.warning(f"Nenhum cabeçalho válido encontrado na aba '{aba_name}'.")
-                return []
-
-            # Filtrar os dados para incluir apenas as colunas válidas e tratar valores vazios
-            filtered_data = []
-            filtered_data.append([header[i] for i in valid_columns_indices])  # Adiciona os cabeçalhos
-            
-            for row in data[1:]:  # Para cada linha de dados
-                filtered_row = []
-                for i in valid_columns_indices:
-                    value = row[i] if i < len(row) else ""  # Trata índices fora do range
-                    
-                    # Tratamento especial para preservar números longos
-                    if isinstance(value, (int, float)) or (isinstance(value, str) and value.replace('.','').replace(',','').isdigit()):
-                        try:
-                            # Tenta converter para número e depois para string para remover notação científica
-                            value = str(int(float(str(value).replace(',', '').replace('.', ''))))
-                        except (ValueError, TypeError):
-                            value = str(value).strip()
-                    else:
-                        value = str(value).strip() if value is not None else ""
-                    
-                    filtered_row.append(value)
-                filtered_data.append(filtered_row)
-            
-            logging.info(f"Dados da aba '{aba_name}' lidos e filtrados com sucesso.")
-            return filtered_data
-        
+            return aba.get_all_values()
         except Exception as e:
             logging.error(f"Erro ao ler dados da aba '{aba_name}': {e}")
-            st.error(f"Erro ao ler dados da aba '{aba_name}': {e}")
+            st.error(f"Erro ao carregar dados da aba '{aba_name}'. Verifique o console.")
             return None
         
-        
     def adc_dados(self, new_data):
-        if not self.credentials or not self.my_archive_google_sheets:
-            return
+        if not self.credentials: return
         try:
-            logging.info(f"Tentando adicionar dados: {new_data}")
             archive = self.credentials.open_by_url(self.my_archive_google_sheets)
-            aba_name = 'acess'
-            if aba_name not in [sheet.title for sheet in archive.worksheets()]:
-                logging.error(f"A aba '{aba_name}' não existe no Google Sheets.")
-                st.error(f"A aba '{aba_name}' não foi encontrada na planilha.")
-                return
-            aba = archive.worksheet_by_title(aba_name)
-
-            # Esta parte do código está gerando um novo ID único para os dados a serem adicionados ao
-            # Google Sheets. O ID é um número aleatório de 4 dígitos que não pode ser repetido.
-            existing_ids = [row[0] for row in aba.get_all_values()[1:]]  #
+            aba = archive.worksheet_by_title('acess')
+            
+            existing_ids = {row[0] for row in aba.get_all_values()[1:]}
             while True:
                 new_id = random.randint(1000, 9999)
                 if str(new_id) not in existing_ids:
                     break
 
-            new_data.insert(0, new_id)  # Insere o novo ID no início da lista new_data
-            aba.append_table(values=new_data)  # Adiciona a linha à tabela dinamicamente
-            logging.info("Dados adicionados com sucesso.")
-            st.success("Dados adicionados com sucesso!")
+            new_data.insert(0, str(new_id))
+            aba.append_table(values=new_data)
         except Exception as e:
             logging.error(f"Erro ao adicionar dados: {e}", exc_info=True)
             st.error(f"Erro ao adicionar dados: {e}")
 
-    def editar_dados(self, id, updated_data):
-        if not self.credentials or not self.my_archive_google_sheets:
-            return False
+    def editar_dados(self, id_registro, updated_data):
+        if not self.credentials: return False
         try:
-            logging.info(f"Tentando editar dados do ID {id}")
             archive = self.credentials.open_by_url(self.my_archive_google_sheets)
             aba = archive.worksheet_by_title('acess')
             data = aba.get_all_values()
             
-            # Procurar a linha com o ID correspondente
             for i, row in enumerate(data):
-                if row[0] == str(id):  # ID está na primeira coluna
-                    # Atualizar a linha com os novos dados, mantendo o ID original
-                    updated_row = [str(id)] + updated_data
-                    aba.update_row(i + 1, updated_row)  # +1 porque as linhas começam em 1
-                    logging.info("Dados editados com sucesso.")
+                if row and row[0] == str(id_registro):
+                    aba.update_row(i + 1, [str(id_registro)] + updated_data)
                     return True
-                    
-            logging.error(f"ID {id} não encontrado.")
             return False
-            
         except Exception as e:
             logging.error(f"Erro ao editar dados: {e}", exc_info=True)
             return False
 
-    def excluir_dados(self, id):
-        if not self.credentials or not self.my_archive_google_sheets:
-            return False
+    def excluir_dados(self, id_registro):
+        if not self.credentials: return False
         try:
-            logging.info(f"Tentando excluir dados do ID {id}")
             archive = self.credentials.open_by_url(self.my_archive_google_sheets)
             aba = archive.worksheet_by_title('acess')
             data = aba.get_all_values()
             
-            # Procurar a linha com o ID correspondente
             for i, row in enumerate(data):
-                if row[0] == str(id):  # ID está na primeira coluna
-                    aba.delete_rows(i + 1)  # +1 porque as linhas começam em 1
-                    logging.info("Dados excluídos com sucesso.")
+                if row and row[0] == str(id_registro):
+                    aba.delete_rows(i + 1)
                     return True
-                    
-            logging.error(f"ID {id} não encontrado.")
             return False
-            
         except Exception as e:
             logging.error(f"Erro ao excluir dados: {e}", exc_info=True)
             return False
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
