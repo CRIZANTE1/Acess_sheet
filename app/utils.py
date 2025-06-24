@@ -22,7 +22,7 @@ def clean_and_sort_name(name):
     # Ordena as palavras para que "Silva Jose" e "Jose Silva" sejam idênticos
     return ' '.join(sorted(name.split()))
 
-def normalize_names(name_series: pd.Series, threshold=85) -> pd.Series:
+def normalize_names(name_series: pd.Series, threshold=75) -> pd.Series:
     """
     Normaliza nomes de forma precisa e performática.
     Usa um pré-processamento inteligente antes do fuzzy matching.
