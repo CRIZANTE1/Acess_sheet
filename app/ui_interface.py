@@ -1,11 +1,13 @@
+# app/ui_interface.py
+
 import streamlit as st
 import pandas as pd
 from datetime import datetime
 from app.data_operations import add_record, update_exit_time, delete_record, check_blocked_records
 from app.operations import SheetOperations
-from app.utils import format_cpf, validate_cpf, get_sao_paulo_time 
+from app.utils import format_cpf, validate_cpf, get_sao_paulo_time
 
-
+# --- Funções de Apoio ---
 def get_person_status(name, df):
     if name is None or name == "--- Novo Cadastro ---" or name == "": return "Novo", None
     if df.empty: return "Novo", None
@@ -33,7 +35,7 @@ def show_people_inside(df, sheet_operations):
         with col3:
             record_id = row.get("ID", row['Nome'] + row['Data'])
             if st.button("Sair", key=f"exit_{record_id}", use_container_width=True):
-                now = get_sao_paulo_time() # <-- CORRIGIDO
+                now = get_sao_paulo_time()
                 success, message = update_exit_time(row['Nome'], now.strftime("%d/%m/%Y"), now.strftime("%H:%M"))
                 if success:
                     st.success(f"Saída de {row['Nome']} registrada!")
@@ -69,7 +71,7 @@ def vehicle_access_interface():
             st.info(f"**{selected_name}** está **DENTRO** da unidade.")
             st.write(f"**Entrada em:** {latest_record['Data']} às {latest_record['Horário de Entrada']}")
             if st.button(f"✅ Registrar Saída de {selected_name}", use_container_width=True, type="primary"):
-                now = get_sao_paulo_time() # <-- CORRIGIDO
+                now = get_sao_paulo_time()
                 success, message = update_exit_time(selected_name, now.strftime("%d/%m/%Y"), now.strftime("%H:%M"))
                 if success:
                     st.success(message)
@@ -83,12 +85,12 @@ def vehicle_access_interface():
             st.write(f"**Última saída em:** {latest_record.get('Data', 'N/A')} às {latest_record.get('Horário de Saída', 'N/A')}")
             with st.form(key="reentry_form"):
                 st.write("Registrar nova entrada:")
-                placa = st.text_input("Placa", value=latest_record.get("Placa", ""))
-                empresa = st.text_input("Empresa", value=latest_record.get("Empresa", ""))
+                placa = st.text_input("Placa", value=str(latest_record.get("Placa", "")))
+                empresa = st.text_input("Empresa", value=str(latest_record.get("Empresa", "")))
                 aprovador = st.selectbox("Aprovador:", options=aprovadores_autorizados)
                 if st.form_submit_button(f"▶️ Registrar Entrada de {selected_name}", use_container_width=True, type="primary"):
-                    now = get_sao_paulo_time() # <-- CORRIGIDO
-                    add_record(name=selected_name, cpf=latest_record.get("CPF", ""), placa=placa, marca_carro=latest_record.get("Marca do Carro", ""), horario_entrada=now.strftime("%H:%M"), data=now.strftime("%d/%m/%Y"), empresa=empresa, status="Autorizado", motivo="", aprovador=aprovador)
+                    now = get_sao_paulo_time()
+                    add_record(name=selected_name, cpf=str(latest_record.get("CPF", "")), placa=placa, marca_carro=str(latest_record.get("Marca do Carro", "")), horario_entrada=now.strftime("%H:%M"), data=now.strftime("%d/%m/%Y"), empresa=empresa, status="Autorizado", motivo="", aprovador=aprovador)
                     data = sheet_operations.carregar_dados()
                     st.session_state.df_acesso_veiculos = pd.DataFrame(data[1:], columns=data[0])
                     st.session_state.person_selector = selected_name
@@ -109,7 +111,7 @@ def vehicle_access_interface():
                     if not name or not cpf or not empresa or (status_entrada == "Autorizado" and not aprovador): st.error("Preencha os campos obrigatórios.")
                     elif not validate_cpf(cpf): st.error("CPF inválido.")
                     else:
-                        now = get_sao_paulo_time() # <-- CORRIGIDO
+                        now = get_sao_paulo_time()
                         add_record(name=name, cpf=format_cpf(cpf), placa=placa, marca_carro=marca_carro, horario_entrada=now.strftime("%H:%M"), data=now.strftime("%d/%m/%Y"), empresa=empresa, status=status_entrada, motivo=motivo_bloqueio, aprovador=aprovador)
                         data = sheet_operations.carregar_dados()
                         st.session_state.df_acesso_veiculos = pd.DataFrame(data[1:], columns=data[0])
@@ -131,9 +133,24 @@ def vehicle_access_interface():
                 motivo = st.text_input("Motivo do bloqueio:", key="block_reason")
                 if st.button("Aplicar Bloqueio", key="apply_block"):
                     if motivo:
-                        now = get_sao_paulo_time() # <-- CORRIGIDO
+                        now = get_sao_paulo_time()
+                        # Pega o último registro da pessoa no DataFrame
                         last_record = df[df["Nome"] == person_to_block].sort_values("Data").iloc[-1]
-                        add_record(name=person_to_block, cpf=last_record.get("CPF", ""), placa="", marca_carro="", horario_entrada=now.strftime("%H:%M"), data=now.strftime("%d/%m/%Y"), empresa=last_record.get("Empresa", ""), status="Bloqueado", motivo=motivo, aprovador="")
+                        
+                        # --- CORREÇÃO APLICADA AQUI ---
+                        # Converte explicitamente os valores para string antes de passar para add_record
+                        add_record(
+                            name=str(person_to_block),
+                            cpf=str(last_record.get("CPF", "")),
+                            placa="",  # Bloqueio não precisa de placa
+                            marca_carro="",
+                            horario_entrada=now.strftime("%H:%M"),
+                            data=now.strftime("%d/%m/%Y"),
+                            empresa=str(last_record.get("Empresa", "")),
+                            status="Bloqueado",
+                            motivo=motivo,
+                            aprovador=""
+                        )
                         data = sheet_operations.carregar_dados()
                         st.session_state.df_acesso_veiculos = pd.DataFrame(data[1:], columns=data[0])
                         st.rerun()
@@ -155,8 +172,6 @@ def vehicle_access_interface():
     
     with st.expander("Visualizar todos os registros"):
         st.dataframe(df.fillna(""), use_container_width=True)
-
-
 
 
 
