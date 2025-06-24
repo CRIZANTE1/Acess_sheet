@@ -1,8 +1,31 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime, timedelta
 from app.operations import SheetOperations
-from app.utils import validate_cpf, format_cpf
+
+def load_data_from_sheets():
+    """Carrega os dados da planilha e armazena no estado da sessão."""
+    try:
+        sheet_operations = SheetOperations()
+        data = sheet_operations.carregar_dados()
+        if data:
+            st.session_state.df_acesso_veiculos = pd.DataFrame(data[1:], columns=data[0]).fillna("")
+        else:
+            st.session_state.df_acesso_veiculos = pd.DataFrame()
+    except Exception as e:
+        st.error(f"Falha ao carregar dados iniciais: {e}")
+        st.session_state.df_acesso_veiculos = pd.DataFrame()
+
+def add_record(name, cpf, placa, marca_carro, horario_entrada, data, empresa, status, motivo, aprovador):
+    """Adiciona um novo registro de acesso."""
+    try:
+        sheet_operations = SheetOperations()
+        first_reg_date = data if status == "Autorizado" else ""
+        new_data = [name, cpf, placa, marca_carro, horario_entrada, "", data, empresa, status, motivo, aprovador, first_reg_date]
+        sheet_operations.adc_dados(new_data)
+        return True
+    except Exception as e:
+        st.error(f"Erro ao adicionar registro: {e}")
+        return False
 
 def update_exit_time(name, exit_date_str, exit_time_str):
     """Atualiza o horário de saída de um registro."""
@@ -11,14 +34,17 @@ def update_exit_time(name, exit_date_str, exit_time_str):
         all_data = sheet_operations.carregar_dados()
         df = pd.DataFrame(all_data[1:], columns=all_data[0])
         
-        open_records = df[(df["Nome"] == name) & (df["Horário de Saída"] == "")]
+        open_records = df[(df["Nome"] == name) & ((df["Horário de Saída"] == "") | pd.isna(df["Horário de Saída"]))]
         if open_records.empty:
-            return False, "Nenhum registro em aberto encontrado."
+            return False, "Nenhum registro em aberto encontrado para esta pessoa."
 
         record_to_update = open_records.iloc[0]
         record_id = record_to_update["ID"]
         
-        original_row = [row for row in all_data if row[0] == record_id][0]
+        original_row = next((row for row in all_data if row[0] == record_id), None)
+        if original_row is None:
+            return False, "Não foi possível encontrar o registro original para editar."
+
         header = all_data[0]
         exit_time_index = header.index("Horário de Saída")
         
@@ -30,20 +56,7 @@ def update_exit_time(name, exit_date_str, exit_time_str):
         else:
             return False, "Falha ao editar os dados na planilha."
     except Exception as e:
-        return False, f"Erro ao atualizar horário: {e}"
-
-def add_record(name, cpf, placa, marca_carro, horario_entrada, data, empresa, status, motivo, aprovador):
-    """Adiciona um novo registro de acesso."""
-    try:
-        sheet_operations = SheetOperations()
-        # Garante que a data do primeiro registro seja enviada corretamente
-        first_reg_date = data if status == "Autorizado" else ""
-        new_data = [name, cpf, placa, marca_carro, horario_entrada, "", data, empresa, status, motivo, aprovador, first_reg_date]
-        sheet_operations.adc_dados(new_data)
-        return True
-    except Exception as e:
-        st.error(f"Erro ao adicionar registro: {e}")
-        return False
+        return False, f"Erro ao atualizar horário de saída: {e}"
 
 def delete_record(name, data_str):
     """Deleta um registro de acesso com base no nome e na data."""
@@ -75,41 +88,6 @@ def check_blocked_records(df):
         return info
     except Exception:
         return None
-
-def check_entry(name, data, df):
-    record = None
-    if data:
-        record_df = df[(df["Nome"] == name) & (df["Data"] == data)]
-    else:
-        record_df = df[df["Nome"] == name]
-    if not record_df.empty:
-        record = record_df.iloc[0]
-        return record, "Registro encontrado."
-    return None, "Registro não encontrado."
-
-def get_block_info(name, df):
-    blocked_df = df[(df["Nome"] == name) & (df["Status da Entrada"] == "Bloqueado")]
-    if not blocked_df.empty:
-        latest = blocked_df.iloc[0]
-        return {"motivo": latest["Motivo do Bloqueio"], "data": latest["Data"], "aprovador": latest["Aprovador"]}
-    return None
-
-# --- FUNÇÃO RESTAURADA ---
-def load_data_from_sheets():
-    """Carrega os dados da planilha e armazena no estado da sessão."""
-    try:
-        sheet_operations = SheetOperations()
-        data = sheet_operations.carregar_dados()
-        if data:
-            columns = data[0]
-            df = pd.DataFrame(data[1:], columns=columns)
-            st.session_state.df_acesso_veiculos = df.fillna("")
-        else:
-            st.session_state.df_acesso_veiculos = pd.DataFrame()
-    except Exception as e:
-        st.error(f"Falha ao carregar dados iniciais: {e}")
-        st.session_state.df_acesso_veiculos = pd.DataFrame()
-
 
 
 
