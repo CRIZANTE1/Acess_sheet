@@ -41,7 +41,20 @@ def vehicle_access_interface():
     st.title("Controle de Acesso BAERI")
     sheet_operations = SheetOperations()
     aprovadores_autorizados = sheet_operations.carregar_dados_aprovadores()
-    
+
+    with st.expander("Briefing de Segurança e Lembretes", expanded=True):
+        st.write("""
+        **ATENÇÃO:**
+        1. O acesso de veículos deve ser controlado rigorosamente para garantir a segurança do local.
+        2. Apenas pessoas autorizadas podem liberar o acesso.
+        3. Em caso de dúvidas, entre em contato com o responsável pela segurança.
+        4. Mantenha sempre os dados atualizados e verifique as informações antes de liberar o acesso.
+        5. **Sempre que for a primeira vez do visitante ou um ano desde o último acesso, repassar o vídeo abaixo.**
+        """)
+        try:
+            st.video("https://youtu.be/QqUkeTucwkI")
+        except Exception as e:
+            st.error(f"Erro ao carregar o vídeo: {e}")
     # Função para recarregar dados
     def reload_data():
         data = sheet_operations.carregar_dados()
@@ -141,20 +154,7 @@ def vehicle_access_interface():
     with st.expander("Visualizar todos os registros"):
         st.dataframe(df.fillna(""), use_container_width=True, hide_index=True)
         
-    with st.expander("Briefing de Segurança e Lembretes"):
-        st.write("""
-        **ATENÇÃO:**
-        1. O acesso de veículos deve ser controlado rigorosamente para garantir a segurança do local.
-        2. Apenas pessoas autorizadas podem liberar o acesso.
-        3. Em caso de dúvidas, entre em contato com o responsável pela segurança.
-        4. Mantenha sempre os dados atualizados e verifique as informações antes de liberar o acesso.
-        5. **Sempre que for a primeira vez do visitante ou um ano desde o último acesso, repassar o vídeo abaixo.**
-        """)
-        try:
-            st.video("https://youtu.be/QqUkeTucwkI")
-        except Exception as e:
-            st.error(f"Erro ao carregar o vídeo: {e}")
-
+    
 
 
 
