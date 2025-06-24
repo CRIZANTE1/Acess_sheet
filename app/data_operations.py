@@ -77,7 +77,6 @@ def check_blocked_records(df):
     except Exception:
         return None
 
-# Funções que estavam no seu código original e que a interface usa
 def check_entry(name, data, df):
     record = None
     if data:
@@ -96,13 +95,21 @@ def get_block_info(name, df):
         return {"motivo": latest["Motivo do Bloqueio"], "data": latest["Data"], "aprovador": latest["Aprovador"]}
     return None
 
-
-
-
-
-
-
-
+# --- FUNÇÃO RESTAURADA ---
+def load_data_from_sheets():
+    """Carrega os dados da planilha e armazena no estado da sessão."""
+    try:
+        sheet_operations = SheetOperations()
+        data = sheet_operations.carregar_dados()
+        if data:
+            columns = data[0]
+            df = pd.DataFrame(data[1:], columns=columns)
+            st.session_state.df_acesso_veiculos = df.fillna("")
+        else:
+            st.session_state.df_acesso_veiculos = pd.DataFrame()
+    except Exception as e:
+        st.error(f"Falha ao carregar dados iniciais: {e}")
+        st.session_state.df_acesso_veiculos = pd.DataFrame()
 
 
 
