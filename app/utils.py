@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 import pandas as pd
 import pytz
+from fuzzywuzzy import process
 
 def get_sao_paulo_time():
     """Retorna o horário atual com o fuso horário de São Paulo (America/Sao_Paulo)."""
