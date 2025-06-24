@@ -49,36 +49,56 @@ def validate_cpf(cpf):
     
 def normalize_names(name_series: pd.Series, threshold=90) -> pd.Series:
     """
-    Normaliza uma série de nomes usando fuzzy string matching.
-    Agrupa nomes semelhantes (ex: "José Silva" e "Jose da Silva").
+    Normaliza uma série de nomes de forma robusta usando fuzzy matching.
+    1. Agrupa nomes semelhantes.
+    2. Escolhe o representante mais comum de cada grupo.
+    3. Mapeia todos os nomes do grupo para o seu representante.
     """
-    # 1. Cria uma lista de "nomes canônicos" (únicos e limpos)
-    # Convertemos para minúsculas e removemos espaços para uma comparação justa
-    cleaned_names = name_series.str.lower().str.strip().dropna()
-    canonical_choices = list(cleaned_names.unique())
-
-    # 2. Cria um mapa de nomes "sujos" para nomes "limpos"
+    # Remove nomes nulos/vazios e obtém uma lista de nomes únicos para processar
+    unique_names = name_series.dropna().unique()
+    
+    # Dicionário para mapear cada nome original ao seu nome canônico/representante
     name_map = {}
-    for name in name_series.dropna().unique():
-        # Se já mapeamos, pulamos
-        if name in name_map:
+    
+    # Conjunto para rastrear nomes que já foram atribuídos a um grupo
+    processed_names = set()
+
+    for name in unique_names:
+        if name in processed_names:
             continue
+
+        # Encontra um grupo de nomes semelhantes ao nome atual
+        # Usamos `process.extract` para obter todas as correspondências acima do limiar
+        matches = process.extract(name, unique_names, scorer=fuzz.WRatio, limit=None)
         
-        # Encontra a melhor correspondência na lista canônica
-        # O scorer padrão (WRatio) lida bem com ordem de palavras e palavras faltando
-        match, score = process.extractOne(name.lower().strip(), canonical_choices)
-
-        # 3. Se a semelhança for alta, mapeia para o nome canônico
-        # Senão, mantém o nome original (apenas com letras maiúsculas)
-        if score >= threshold:
-            # Encontra o formato original do nome canônico para manter a capitalização
-            original_canonical_name = name_series[name_series.str.lower().str.strip() == match].iloc[0]
-            name_map[name] = original_canonical_name
-        else:
+        # Filtra apenas as correspondências com score alto
+        similar_names = [match[0] for match in matches if match[1] >= threshold]
+        
+        if not similar_names:
+            # Se não houver nomes semelhantes, o nome é seu próprio representante
             name_map[name] = name
+            processed_names.add(name)
+            continue
 
-    # 4. Aplica o mapa à série original
+        # --- Escolhe o melhor representante para o grupo ---
+        # Conta a frequência de cada nome semelhante na série original completa
+        group_counts = name_series[name_series.isin(similar_names)].value_counts()
+        
+        if not group_counts.empty:
+            # O representante é o nome mais frequente no grupo
+            representative = group_counts.index[0]
+        else:
+            # Fallback: se nenhum nome for encontrado, usa o próprio nome como representante
+            representative = name
+            
+        # Mapeia todos os nomes do grupo para o representante escolhido
+        for similar_name in similar_names:
+            name_map[similar_name] = representative
+            processed_names.add(similar_name)
+            
+    # Aplica o mapeamento final à série original
     return name_series.map(name_map)
+
     
 def round_to_nearest_interval(time_value, interval=1):
     """Arredonda o horário para o intervalo mais próximo."""
