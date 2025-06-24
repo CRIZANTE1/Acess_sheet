@@ -1,14 +1,19 @@
+# app/ui_interface.py
+
 import streamlit as st
 import pandas as pd
-from app.data_operations import add_record, update_exit_time, delete_record, check_blocked_records
-from app.operations import SheetOperations
-from app.utils import format_cpf, validate_cpf, get_sao_paulo_time, normalize_names # <-- Importa a função melhorada
+from app.data_operations import add_record, update_exit_time, delete_record, check_blocked_records, get_aprovadores
+from app.utils import format_cpf, validate_cpf, get_sao_paulo_time, clean_name
 
 def get_person_status(name, df):
     if not name or name == "--- Novo Cadastro ---": return "Novo", None
     if df.empty: return "Novo", None
     
-    person_records = df[df["Nome"] == name].copy()
+    # Cria a coluna de nome limpo para a busca
+    df['Nome_Limpo'] = df['Nome'].apply(clean_name)
+    clean_selected_name = clean_name(name)
+    person_records = df[df["Nome_Limpo"] == clean_selected_name].copy()
+    
     if person_records.empty: return "Fora", None
     
     person_records['Data_dt'] = pd.to_datetime(person_records['Data'], format='%d/%m/%Y', errors='coerce')
@@ -22,7 +27,7 @@ def get_person_status(name, df):
     if pd.isna(horario_saida) or str(horario_saida).strip() == "": return "Dentro", latest_record
     else: return "Fora", latest_record
 
-def show_people_inside(df, sheet_operations):
+def show_people_inside(df):
     st.subheader("Pessoas na Unidade")
     inside_df = df[pd.isna(df["Horário de Saída"]) | (df["Horário de Saída"] == "")].copy().sort_values("Nome")
     if inside_df.empty:
@@ -38,13 +43,12 @@ def show_people_inside(df, sheet_operations):
                 now = get_sao_paulo_time()
                 success, message = update_exit_time(row['Nome'], now.strftime("%d/%m/%Y"), now.strftime("%H:%M"))
                 if success:
-                    st.success(f"Saída de {row['Nome']} registrada!"); st.rerun()
+                    st.success(message); st.rerun()
                 else: st.error(message)
 
 def vehicle_access_interface():
     st.title("Controle de Acesso BAERI")
-    sheet_operations = SheetOperations()
-    aprovadores_autorizados = sheet_operations.carregar_dados_aprovadores()
+    aprovadores_autorizados = get_aprovadores()
 
     with st.expander("Briefing de Segurança e Lembretes", expanded=True):
         st.write("""
@@ -59,42 +63,30 @@ def vehicle_access_interface():
             st.video("https://youtu.be/QqUkeTucwkI")
         except Exception as e:
             st.error(f"Erro ao carregar o vídeo: {e}")
-    
-    def reload_data():
-        data = sheet_operations.carregar_dados()
-        df = pd.DataFrame(data[1:], columns=data[0]).fillna("") if data else pd.DataFrame()
         
-        # --- NORMALIZAÇÃO APRIMORADA APLICADA AQUI ---
-        if "Nome" in df.columns and not df.empty:
-            df["Nome"] = normalize_names(df["Nome"])
-            
-        st.session_state.df_acesso_veiculos = df
-
-    if 'df_acesso_veiculos' not in st.session_state:
-        reload_data()
-        
-    df = st.session_state.df_acesso_veiculos
+    df = st.session_state.get('df_acesso_veiculos', pd.DataFrame())
 
     if df.empty:
         st.warning("Não foi possível carregar os dados ou a planilha está vazia.")
+        if st.button("Tentar Recarregar Dados"):
+            from app.data_operations import load_data_from_sheets
+            load_data_from_sheets()
+            st.rerun()
         return
 
     blocked_info = check_blocked_records(df)
     if blocked_info: st.error("Atenção! Pessoas com bloqueio ativo:\n\n" + blocked_info)
 
-    # A lista de nomes únicos agora funcionará corretamente
-    unique_names = sorted(list(df["Nome"].unique()))
+    unique_names_map = {clean_name(name): name for name in df["Nome"].dropna() if name.strip()}
+    unique_names = sorted(list(unique_names_map.values()))
 
     col_main, col_sidebar = st.columns([2, 1])
     with col_main:
         st.header("Painel de Registro")
-        
         search_options = ["--- Novo Cadastro ---"] + unique_names
         selected_name = st.selectbox("Busque por um nome ou selecione 'Novo Cadastro':", options=search_options, index=0, key="person_selector")
-        
         status, latest_record = get_person_status(selected_name, df)
         
-        # O resto do código da interface permanece o mesmo
         if status == "Dentro":
             st.info(f"**{selected_name}** está **DENTRO** da unidade.")
             st.write(f"**Entrada em:** {latest_record['Data']} às {latest_record['Horário de Entrada']}")
@@ -103,6 +95,7 @@ def vehicle_access_interface():
                 success, message = update_exit_time(selected_name, now.strftime("%d/%m/%Y"), now.strftime("%H:%M"))
                 if success: st.success(message); st.rerun()
                 else: st.error(message)
+
         elif status == "Fora":
             st.success(f"**{selected_name}** está **FORA** da unidade.")
             st.write(f"**Última saída em:** {latest_record.get('Data', 'N/A')} às {latest_record.get('Horário de Saída', 'N/A')}")
@@ -115,6 +108,7 @@ def vehicle_access_interface():
                     now = get_sao_paulo_time()
                     if add_record(name=selected_name, cpf=str(latest_record.get("CPF", "")), placa=placa, marca_carro=str(latest_record.get("Marca do Carro", "")), horario_entrada=now.strftime("%H:%M"), data=now.strftime("%d/%m/%Y"), empresa=empresa, status="Autorizado", motivo="", aprovador=aprovador):
                         st.success(f"Nova entrada de {selected_name} registrada!"); st.rerun()
+
         elif status == "Novo":
             st.info("Pessoa não encontrada. Preencha o formulário.")
             with st.form(key="new_visitor_form"):
@@ -136,7 +130,7 @@ def vehicle_access_interface():
                             st.success(f"Novo registro para {name} criado!"); st.rerun()
 
     with col_sidebar:
-        if not df.empty: show_people_inside(df, sheet_operations)
+        show_people_inside(df)
     
     st.divider()
 
@@ -160,15 +154,19 @@ def vehicle_access_interface():
             person_to_delete = st.selectbox("Selecione para deletar último registro:", options=[""] + unique_names, key="delete_person", index=0)
             if person_to_delete:
                 if st.button("Deletar Último Registro", key="apply_delete", type="secondary"):
-                    records = df[df["Nome"] == person_to_delete].copy()
+                    df['Nome_Limpo'] = df['Nome'].apply(clean_name)
+                    clean_del_name = clean_name(person_to_delete)
+                    records = df[df["Nome_Limpo"] == clean_del_name].copy()
+                    
                     records['Data_dt'] = pd.to_datetime(records['Data'], format='%d/%m/%Y', errors='coerce')
                     last_record = records.sort_values(by='Data_dt', ascending=False).iloc[0]
-                    if delete_record(person_to_delete, last_record['Data']):
+                    
+                    if delete_record(last_record['Nome'], last_record['Data']):
                         st.success(f"Último registro de {person_to_delete} deletado."); st.rerun()
                     else: st.error("Falha ao deletar registro.")
     
     with st.expander("Visualizar todos os registros"):
-        st.dataframe(df.fillna(""), use_container_width=True, hide_index=True)
+        st.dataframe(df.drop(columns=['Nome_Limpo'], errors='ignore').fillna(""), use_container_width=True, hide_index=True)
 
 
 
