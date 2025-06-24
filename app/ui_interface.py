@@ -2,19 +2,19 @@ import streamlit as st
 import pandas as pd
 from app.data_operations import add_record, update_exit_time, delete_record, check_blocked_records
 from app.operations import SheetOperations
-from app.utils import format_cpf, validate_cpf, get_sao_paulo_time, clean_name
+from app.utils import format_cpf, validate_cpf, get_sao_paulo_time, normalize_names # <-- Importa a função melhorada
 
 def get_person_status(name, df):
     if not name or name == "--- Novo Cadastro ---": return "Novo", None
     if df.empty: return "Novo", None
     
-    clean_selected_name = clean_name(name)
-    person_records = df[df["Nome_Limpo"] == clean_selected_name].copy()
+    person_records = df[df["Nome"] == name].copy()
     if person_records.empty: return "Fora", None
     
     person_records['Data_dt'] = pd.to_datetime(person_records['Data'], format='%d/%m/%Y', errors='coerce')
     person_records.dropna(subset=['Data_dt'], inplace=True)
     person_records = person_records.sort_values(by=['Data_dt', 'Horário de Entrada'], ascending=[False, False])
+    
     if person_records.empty: return "Fora", None
     
     latest_record = person_records.iloc[0]
@@ -60,28 +60,13 @@ def vehicle_access_interface():
         except Exception as e:
             st.error(f"Erro ao carregar o vídeo: {e}")
     
-    # --- FUNÇÃO DE RECARGA DE DADOS CORRIGIDA ---
     def reload_data():
         data = sheet_operations.carregar_dados()
-        if not data or len(data) < 1:
-            st.session_state.df_acesso_veiculos = pd.DataFrame()
-            return
-            
-        header = data[0]
-        num_columns = len(header)
-        data_rows = data[1:]
-
-        # Garante que todas as linhas tenham o mesmo número de colunas do cabeçalho
-        processed_rows = []
-        for row in data_rows:
-            # Preenche a linha com strings vazias se for mais curta que o cabeçalho
-            processed_row = (row + [''] * num_columns)[:num_columns]
-            processed_rows.append(processed_row)
-            
-        df = pd.DataFrame(processed_rows, columns=header).fillna("")
+        df = pd.DataFrame(data[1:], columns=data[0]).fillna("") if data else pd.DataFrame()
         
+        # --- NORMALIZAÇÃO APRIMORADA APLICADA AQUI ---
         if "Nome" in df.columns and not df.empty:
-            df['Nome_Limpo'] = df['Nome'].apply(clean_name)
+            df["Nome"] = normalize_names(df["Nome"])
             
         st.session_state.df_acesso_veiculos = df
 
@@ -90,16 +75,16 @@ def vehicle_access_interface():
         
     df = st.session_state.df_acesso_veiculos
 
-    # Adiciona uma verificação para garantir que o DataFrame não está vazio antes de prosseguir
     if df.empty:
         st.warning("Não foi possível carregar os dados ou a planilha está vazia.")
-        return # Para a execução se não houver dados
+        return
 
     blocked_info = check_blocked_records(df)
     if blocked_info: st.error("Atenção! Pessoas com bloqueio ativo:\n\n" + blocked_info)
 
+    # A lista de nomes únicos agora funcionará corretamente
     unique_names = sorted(list(df["Nome"].unique()))
-    
+
     col_main, col_sidebar = st.columns([2, 1])
     with col_main:
         st.header("Painel de Registro")
@@ -107,12 +92,9 @@ def vehicle_access_interface():
         search_options = ["--- Novo Cadastro ---"] + unique_names
         selected_name = st.selectbox("Busque por um nome ou selecione 'Novo Cadastro':", options=search_options, index=0, key="person_selector")
         
-        if not selected_name or selected_name == "--- Novo Cadastro ---":
-            status = "Novo"
-            latest_record = None
-        else:
-            status, latest_record = get_person_status(selected_name, df)
+        status, latest_record = get_person_status(selected_name, df)
         
+        # O resto do código da interface permanece o mesmo
         if status == "Dentro":
             st.info(f"**{selected_name}** está **DENTRO** da unidade.")
             st.write(f"**Entrada em:** {latest_record['Data']} às {latest_record['Horário de Entrada']}")
@@ -121,7 +103,6 @@ def vehicle_access_interface():
                 success, message = update_exit_time(selected_name, now.strftime("%d/%m/%Y"), now.strftime("%H:%M"))
                 if success: st.success(message); st.rerun()
                 else: st.error(message)
-
         elif status == "Fora":
             st.success(f"**{selected_name}** está **FORA** da unidade.")
             st.write(f"**Última saída em:** {latest_record.get('Data', 'N/A')} às {latest_record.get('Horário de Saída', 'N/A')}")
@@ -134,7 +115,6 @@ def vehicle_access_interface():
                     now = get_sao_paulo_time()
                     if add_record(name=selected_name, cpf=str(latest_record.get("CPF", "")), placa=placa, marca_carro=str(latest_record.get("Marca do Carro", "")), horario_entrada=now.strftime("%H:%M"), data=now.strftime("%d/%m/%Y"), empresa=empresa, status="Autorizado", motivo="", aprovador=aprovador):
                         st.success(f"Nova entrada de {selected_name} registrada!"); st.rerun()
-
         elif status == "Novo":
             st.info("Pessoa não encontrada. Preencha o formulário.")
             with st.form(key="new_visitor_form"):
@@ -188,7 +168,7 @@ def vehicle_access_interface():
                     else: st.error("Falha ao deletar registro.")
     
     with st.expander("Visualizar todos os registros"):
-        st.dataframe(df.drop(columns=['Nome_Limpo'], errors='ignore').fillna(""), use_container_width=True, hide_index=True)
+        st.dataframe(df.fillna(""), use_container_width=True, hide_index=True)
 
 
 
