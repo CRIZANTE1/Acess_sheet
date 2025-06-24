@@ -45,7 +45,40 @@ def validate_cpf(cpf):
     if resto != int(cpf_digits[10]): return False
     
     return True
+    
+def normalize_names(name_series: pd.Series, threshold=90) -> pd.Series:
+    """
+    Normaliza uma série de nomes usando fuzzy string matching.
+    Agrupa nomes semelhantes (ex: "José Silva" e "Jose da Silva").
+    """
+    # 1. Cria uma lista de "nomes canônicos" (únicos e limpos)
+    # Convertemos para minúsculas e removemos espaços para uma comparação justa
+    cleaned_names = name_series.str.lower().str.strip().dropna()
+    canonical_choices = list(cleaned_names.unique())
 
+    # 2. Cria um mapa de nomes "sujos" para nomes "limpos"
+    name_map = {}
+    for name in name_series.dropna().unique():
+        # Se já mapeamos, pulamos
+        if name in name_map:
+            continue
+        
+        # Encontra a melhor correspondência na lista canônica
+        # O scorer padrão (WRatio) lida bem com ordem de palavras e palavras faltando
+        match, score = process.extractOne(name.lower().strip(), canonical_choices)
+
+        # 3. Se a semelhança for alta, mapeia para o nome canônico
+        # Senão, mantém o nome original (apenas com letras maiúsculas)
+        if score >= threshold:
+            # Encontra o formato original do nome canônico para manter a capitalização
+            original_canonical_name = name_series[name_series.str.lower().str.strip() == match].iloc[0]
+            name_map[name] = original_canonical_name
+        else:
+            name_map[name] = name
+
+    # 4. Aplica o mapa à série original
+    return name_series.map(name_map)
+    
 def round_to_nearest_interval(time_value, interval=1):
     """Arredonda o horário para o intervalo mais próximo."""
     try:
