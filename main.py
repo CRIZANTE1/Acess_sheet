@@ -10,7 +10,8 @@ from app.data_operations import load_data_from_sheets
 st.set_page_config(page_title="Controle de Acesso BAERI", layout="wide")
 
 def main():
-    load_data_from_sheets()
+    if 'df_acesso_veiculos' not in st.session_state:
+        load_data_from_sheets()
 
     if is_user_logged_in():
         show_user_header()
@@ -24,6 +25,7 @@ def main():
             page_options.append("Configurações do Sistema")
             page_options.append("Resumo")
         else:
+            page_options.append("Controle de Acesso") 
             page_options.append("Resumo") 
             
         page = st.sidebar.selectbox("Escolha a página:", page_options)
@@ -45,8 +47,6 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
 
 
 
