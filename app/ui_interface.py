@@ -45,7 +45,11 @@ def vehicle_access_interface():
     with st.expander("Briefing de Segurança e Lembretes", expanded=True):
         st.write("""
         **ATENÇÃO:**
-        ... (conteúdo do briefing) ...
+        1. O acesso de veículos deve ser controlado rigorosamente para garantir a segurança do local.
+        2. Apenas pessoas autorizadas podem liberar o acesso.
+        3. Em caso de dúvidas, entre em contato com o responsável pela segurança.
+        4. Mantenha sempre os dados atualizados e verifique as informações antes de liberar o acesso.
+        5. **Sempre que for a primeira vez do visitante ou um ano desde o último acesso, repassar o vídeo abaixo.**
         """)
         try:
             st.video("https://youtu.be/QqUkeTucwkI")
