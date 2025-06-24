@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+from datetime import datetime, timedelta
 from app.operations import SheetOperations
 
 def load_data_from_sheets():
@@ -7,10 +8,7 @@ def load_data_from_sheets():
     try:
         sheet_operations = SheetOperations()
         data = sheet_operations.carregar_dados()
-        if data:
-            st.session_state.df_acesso_veiculos = pd.DataFrame(data[1:], columns=data[0]).fillna("")
-        else:
-            st.session_state.df_acesso_veiculos = pd.DataFrame()
+        st.session_state.df_acesso_veiculos = pd.DataFrame(data[1:], columns=data[0]).fillna("") if data else pd.DataFrame()
     except Exception as e:
         st.error(f"Falha ao carregar dados iniciais: {e}")
         st.session_state.df_acesso_veiculos = pd.DataFrame()
@@ -28,7 +26,7 @@ def add_record(name, cpf, placa, marca_carro, horario_entrada, data, empresa, st
         return False
 
 def update_exit_time(name, exit_date_str, exit_time_str):
-    """Atualiza o horário de saída de um registro."""
+    """Atualiza o horário de saída, com lógica completa para pernoite."""
     try:
         sheet_operations = SheetOperations()
         all_data = sheet_operations.carregar_dados()
@@ -36,25 +34,48 @@ def update_exit_time(name, exit_date_str, exit_time_str):
         
         open_records = df[(df["Nome"] == name) & ((df["Horário de Saída"] == "") | pd.isna(df["Horário de Saída"]))]
         if open_records.empty:
-            return False, "Nenhum registro em aberto encontrado para esta pessoa."
+            return False, "Nenhum registro em aberto encontrado."
 
         record_to_update = open_records.iloc[0]
         record_id = record_to_update["ID"]
-        
-        original_row = next((row for row in all_data if row[0] == record_id), None)
-        if original_row is None:
-            return False, "Não foi possível encontrar o registro original para editar."
+        entry_date = datetime.strptime(record_to_update["Data"], "%d/%m/%Y")
+        exit_date = datetime.strptime(exit_date_str, "%d/%m/%Y")
 
-        header = all_data[0]
-        exit_time_index = header.index("Horário de Saída")
-        
-        updated_data = original_row[1:]
-        updated_data[exit_time_index - 1] = exit_time_str
-        
-        if sheet_operations.editar_dados(record_id, updated_data):
-            return True, "Horário de saída atualizado com sucesso."
+        # Caso 1: Saída no mesmo dia
+        if entry_date.date() == exit_date.date():
+            original_row = next((row for row in all_data if str(row[0]) == str(record_id)), None)
+            if original_row is None: return False, "Registro não encontrado para edição."
+            header = all_data[0]
+            exit_time_index = header.index("Horário de Saída")
+            updated_data = original_row[1:]
+            updated_data[exit_time_index - 1] = exit_time_str
+            if sheet_operations.editar_dados(record_id, updated_data):
+                return True, "Horário de saída atualizado com sucesso."
+            return False, "Falha ao editar na planilha."
+
+        # Caso 2: Pernoite (saída em dia diferente)
         else:
-            return False, "Falha ao editar os dados na planilha."
+            # 1. Fecha o registro do dia da entrada às 23:59
+            original_row = next((row for row in all_data if str(row[0]) == str(record_id)), None)
+            header = all_data[0]
+            exit_time_index = header.index("Horário de Saída")
+            updated_data = original_row[1:]
+            updated_data[exit_time_index - 1] = "23:59"
+            sheet_operations.editar_dados(record_id, updated_data)
+
+            # 2. Cria registros para dias intermediários
+            current_date = entry_date + timedelta(days=1)
+            while current_date.date() < exit_date.date():
+                intermediate_data = [name, record_to_update.get("CPF", ""), "", "", "00:00", "23:59", current_date.strftime("%d/%m/%Y"), record_to_update.get("Empresa", ""), "Autorizado", "", record_to_update.get("Aprovador", ""), record_to_update.get("Data do Primeiro Registro", "")]
+                sheet_operations.adc_dados(intermediate_data)
+                current_date += timedelta(days=1)
+
+            # 3. Cria registro final para o dia da saída
+            final_data = [name, record_to_update.get("CPF", ""), "", "", "00:00", exit_time_str, exit_date_str, record_to_update.get("Empresa", ""), "Autorizado", "", record_to_update.get("Aprovador", ""), record_to_update.get("Data do Primeiro Registro", "")]
+            sheet_operations.adc_dados(final_data)
+
+            return True, "Registros de pernoite atualizados com sucesso."
+
     except Exception as e:
         return False, f"Erro ao atualizar horário de saída: {e}"
 
@@ -88,9 +109,6 @@ def check_blocked_records(df):
         return info
     except Exception:
         return None
-
-
-
 
 
 
