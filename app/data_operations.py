@@ -3,23 +3,25 @@ import pandas as pd
 import pygsheets
 import random
 from datetime import datetime, timedelta
-import json
-import os
-
 
 class SheetOperations:
     def __init__(self):
         self.credentials = None
         self.spreadsheet_url = None
         try:
-
+            # --- AUTENTICAÇÃO FINAL E CORRETA PARA STREAMLIT CLOUD ---
             if "connections" in st.secrets and "gsheets" in st.secrets["connections"]:
-                creds = st.secrets["connections"]["gsheets"]
-                self.spreadsheet_url = creds["spreadsheet"]
+                # 1. Converte o AttrDict do Streamlit para um dicionário Python padrão
+                creds_dict = dict(st.secrets["connections"]["gsheets"])
+                
+                # 2. Guarda a URL da planilha e a REMOVE da cópia do dicionário
+                self.spreadsheet_url = creds_dict.pop("spreadsheet", None)
+                if not self.spreadsheet_url:
+                    st.error("A chave 'spreadsheet' com a URL não foi encontrada nos seus secrets.")
+                    return
 
-                service_account_json_str = json.dumps(creds)
-                os.environ["GCP_SERVICE_ACCOUNT_STRING"] = service_account_json_str
-                self.credentials = pygsheets.authorize(service_account_env_var="GCP_SERVICE_ACCOUNT_STRING")
+                # 3. Passa o dicionário de credenciais "limpo" para o parâmetro correto
+                self.credentials = pygsheets.authorize(service_account_info=creds_dict)
             else:
                 st.error("Configuração 'connections.gsheets' não encontrada nos Streamlit Secrets.")
 
@@ -177,10 +179,17 @@ def delete_record(name, data_str):
 def check_blocked_records(df):
     if df.empty: return None
     df_copy = df.copy()
+    if 'Nome' in df_copy.columns:
+        from app.utils import clean_name
+        df_copy['Nome_Normalizado'] = df_copy['Nome'].apply(clean_name)
+    
     df_copy['Data_dt'] = pd.to_datetime(df_copy['Data'], format='%d/%m/%Y', errors='coerce')
     df_sorted = df_copy.dropna(subset=['Data_dt']).sort_values(by=['Data_dt', 'Horário de Entrada'], ascending=False)
-    latest_status = df_sorted.drop_duplicates(subset='Nome', keep='first')
+    
+    latest_status = df_sorted.drop_duplicates(subset='Nome_Normalizado', keep='first')
+    
     blocked = latest_status[latest_status["Status da Entrada"] == "Bloqueado"]
     if blocked.empty: return None
+    
     info = "\n".join([f"- **{row['Nome']}**: {row['Motivo do Bloqueio']} (em {row['Data']})" for _, row in blocked.iterrows()])
     return info
