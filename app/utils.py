@@ -55,7 +55,7 @@ def clean_name(name):
     # Remove acentos, converte para minúsculas e remove espaços extras
     name = unidecode(name.lower().strip())
     return ' '.join(name.split())    
-def normalize_names(name_series: pd.Series, threshold=90) -> pd.Series:
+def normalize_names(name_series: pd.Series, threshold=80) -> pd.Series:
     """
     Normaliza uma série de nomes de forma robusta usando fuzzy matching.
     1. Agrupa nomes semelhantes.
