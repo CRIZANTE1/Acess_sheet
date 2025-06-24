@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
 from app.operations import SheetOperations
-# Importa APENAS de operations e utils, nunca da interface
 from app.utils import validate_cpf, format_cpf
 
 def update_exit_time(name, exit_date_str, exit_time_str):
