@@ -240,27 +240,26 @@ def check_entry(name, data):
         st.error(f"Erro ao verificar registro: {str(e)}")
         return None, f"Erro ao verificar registro: {str(e)}"
 
-def get_block_info(name):
+def check_blocked_records(df):
     """
-    Obtém informações de bloqueio de uma pessoa.
+    Verifica registros bloqueados.
     """
     try:
-        sheet_operations = SheetOperations()
-        df = pd.DataFrame(sheet_operations.carregar_dados()[1:], columns=sheet_operations.carregar_dados()[0])
-        
-        blocked = df[(df["Nome"] == name) & (df["Status da Entrada"] == "Bloqueado")]
+        blocked = df[df["Status da Entrada"] == "Bloqueado"]
         if blocked.empty:
             return None
             
-        latest = blocked.iloc[0]
-        return {
-            "motivo": latest["Motivo do Bloqueio"],
-            "data": latest["Data"],
-            "aprovador": latest["Aprovador"]
-        }
+        info = ""
+        for _, row in blocked.iterrows():
+            info += f"Nome: {row['Nome']}\n"
+            info += f"Motivo: {row['Motivo do Bloqueio']}\n"
+            info += f"Data: {row['Data']}\n"
+            info += "---\n"
+            
+        return info
         
     except Exception as e:
-        st.error(f"Erro ao obter informações de bloqueio: {str(e)}")
+        st.error(f"Erro ao verificar registros bloqueados: {str(e)}")
         return None
 
 def get_block_info(name):
@@ -300,6 +299,15 @@ def load_data_from_sheets():
         "ID", "Nome", "CPF", "Placa", "Marca do Carro", "Horário de Entrada", "Horário de Saída", 
         "Data", "Empresa", "Status da Entrada", "Motivo do Bloqueio", "Aprovador", "Data do Primeiro Registro"
     ])
+
+
+
+
+
+
+
+
+
 
 
 
