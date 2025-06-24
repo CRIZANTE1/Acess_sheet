@@ -67,12 +67,11 @@ def vehicle_access_interface():
             load_data_from_sheets(); st.rerun()
         return
 
-    # --- NORMALIZAÇÃO CENTRALIZADA ---
+    # --- NORMALIZAÇÃO CENTRALIZADA E SIMPLES ---
     if "Nome" in df.columns and not df.empty:
-        # A normalização acontece aqui, atualizando a coluna 'Nome' do DataFrame
-        df['Nome'] = normalize_names(df['Nome'])
+        df['Nome'] = normalize_names_simple(df['Nome'])
     
-    # A lista de nomes únicos é criada a partir da coluna já normalizada
+    # Esta linha AGORA VAI funcionar corretamente.
     unique_names = sorted(list(df["Nome"].unique()))
 
     blocked_info = check_blocked_records(df)
@@ -162,11 +161,8 @@ def vehicle_access_interface():
                     last_record = records.sort_values(by='Data_dt', ascending=False).iloc[0]
                     if delete_record(last_record['Nome'], last_record['Data']):
                         st.success(f"Último registro de {person_to_delete} deletado."); st.rerun()
-                    else:
-                        st.error("Falha ao deletar o registro.")
     
     with st.expander("Visualizar todos os registros"):
         st.dataframe(df.fillna(""), use_container_width=True, hide_index=True)
-
 
 
