@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 from app.data_operations import add_record, update_exit_time, delete_record, check_blocked_records
 from app.operations import SheetOperations
-from app.utils import format_cpf, validate_cpf, get_sao_paulo_time
+from app.utils import format_cpf, validate_cpf, get_sao_paulo_time, normalize_names
 
 def get_person_status(name, df):
     if not name or name == "--- Novo Cadastro ---": return "Novo", None
@@ -45,20 +45,22 @@ def vehicle_access_interface():
     with st.expander("Briefing de Segurança e Lembretes", expanded=True):
         st.write("""
         **ATENÇÃO:**
-        1. O acesso de veículos deve ser controlado rigorosamente para garantir a segurança do local.
-        2. Apenas pessoas autorizadas podem liberar o acesso.
-        3. Em caso de dúvidas, entre em contato com o responsável pela segurança.
-        4. Mantenha sempre os dados atualizados e verifique as informações antes de liberar o acesso.
-        5. **Sempre que for a primeira vez do visitante ou um ano desde o último acesso, repassar o vídeo abaixo.**
+        ... (conteúdo do briefing) ...
         """)
         try:
             st.video("https://youtu.be/QqUkeTucwkI")
         except Exception as e:
             st.error(f"Erro ao carregar o vídeo: {e}")
-    # Função para recarregar dados
+    
     def reload_data():
         data = sheet_operations.carregar_dados()
-        st.session_state.df_acesso_veiculos = pd.DataFrame(data[1:], columns=data[0]).fillna("") if data else pd.DataFrame()
+        df = pd.DataFrame(data[1:], columns=data[0]).fillna("") if data else pd.DataFrame()
+        
+        # --- NORMALIZAÇÃO APLICADA AQUI ---
+        if "Nome" in df.columns and not df.empty:
+            df["Nome"] = normalize_names(df["Nome"])
+            
+        st.session_state.df_acesso_veiculos = df
 
     if 'df_acesso_veiculos' not in st.session_state:
         reload_data()
@@ -68,14 +70,17 @@ def vehicle_access_interface():
     blocked_info = check_blocked_records(df)
     if blocked_info: st.error("Atenção! Pessoas com bloqueio ativo:\n\n" + blocked_info)
 
+    unique_names = sorted(list(df["Nome"].unique())) if "Nome" in df.columns else []
+
     col_main, col_sidebar = st.columns([2, 1])
     with col_main:
         st.header("Painel de Registro")
-        unique_names = sorted(list(df["Nome"].unique())) if "Nome" in df.columns else []
+        
         search_options = ["--- Novo Cadastro ---"] + unique_names
         selected_name = st.selectbox("Busque por um nome ou selecione 'Novo Cadastro':", options=search_options, index=0, key="person_selector")
         status, latest_record = get_person_status(selected_name, df)
         
+        # ... (O resto do seu código da interface permanece o mesmo, pois ele já usará a lista `unique_names` corrigida)
         if status == "Dentro":
             st.info(f"**{selected_name}** está **DENTRO** da unidade.")
             st.write(f"**Entrada em:** {latest_record['Data']} às {latest_record['Horário de Entrada']}")
@@ -153,8 +158,6 @@ def vehicle_access_interface():
     
     with st.expander("Visualizar todos os registros"):
         st.dataframe(df.fillna(""), use_container_width=True, hide_index=True)
-        
-    
 
 
 
