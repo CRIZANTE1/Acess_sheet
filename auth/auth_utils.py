@@ -1,5 +1,7 @@
+# auth/auth_utils.py
+
 import streamlit as st
-from app.operations import SheetOperations  # Import SheetOperations
+from app.operations import SheetOperations  # Esta importação é o problema
 
 def is_oidc_available():
     """Verifica se o login OIDC está configurado e disponível"""
@@ -38,6 +40,9 @@ def get_user_role():
 def is_admin():
     """Verifica se o usuário atual é um administrador consultando a aba 'users'."""
     try:
+        # A importação é feita DENTRO da função para evitar o ciclo na inicialização
+        from app.operations import SheetOperations
+        
         user_name = get_user_display_name()
         sheet_operations = SheetOperations()
         users_data = sheet_operations.carregar_dados_aba('users')
@@ -54,7 +59,7 @@ def is_admin():
             admin_names = [row[adm_name_index] for row in users_data[1:]]  # Skip header row
             return user_name in admin_names
         else:
-            st.error("Não foi possível carregar os dados da aba 'users'.")
+            # Não exibe erro se a aba 'users' não existir ou estiver vazia, apenas retorna False
             return False
     except Exception as e:
         st.error(f"Erro na verificação de admin: {str(e)}")
