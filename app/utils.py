@@ -22,43 +22,52 @@ def clean_and_sort_name(name):
     # Ordena as palavras para que "Silva Jose" e "Jose Silva" sejam idênticos
     return ' '.join(sorted(name.split()))
 
-def normalize_names(name_series: pd.Series, threshold=75) -> pd.Series:
+def normalize_names(name_series: pd.Series, threshold=85) -> pd.Series:
     """
-    Normaliza nomes de forma precisa e performática.
-    Usa um pré-processamento inteligente antes do fuzzy matching.
+    Normaliza nomes usando fuzzywuzzy como ferramenta principal para agrupar,
+    e então elege o representante mais comum de cada grupo.
     """
-    # 1. Cria um DataFrame com os nomes originais e suas versões limpas/ordenadas
-    df_names = pd.DataFrame({'original': name_series.dropna()})
-    df_names['cleaned'] = df_names['original'].apply(clean_and_sort_name)
+    original_names = name_series.dropna().unique()
+    if len(original_names) == 0:
+        return name_series
 
-    # 2. Identifica os representantes canônicos
-    # O representante de cada grupo de nomes limpos é a forma original mais comum
-    # value_counts() nos dá a frequência, e .index[0] o mais frequente
-    representatives = df_names.groupby('cleaned')['original'].apply(lambda x: x.value_counts().index[0])
-    
-    # 3. Mapeia cada nome limpo ao seu representante
-    cleaned_to_rep_map = representatives.to_dict()
+    # 1. Limpa todos os nomes únicos para criar uma lista de "mestres" para comparação
+    cleaned_masters = {name: clean_name_for_matching(name) for name in original_names}
+    master_list = list(cleaned_masters.values())
 
-    # 4. Cria o mapa final do nome original para o representante final
-    name_map = {}
-    # Obtém a lista de representantes limpos para a busca com fuzzywuzzy
-    canonical_cleaned_names = list(cleaned_to_rep_map.keys())
-
-    for original_name in name_series.dropna().unique():
-        cleaned_name = clean_and_sort_name(original_name)
-        
-        # Encontra a melhor correspondência para o nome limpo na lista de representantes limpos
-        best_match, score = process.extractOne(cleaned_name, canonical_cleaned_names, scorer=fuzz.WRatio)
-        
+    # 2. Para cada nome original, encontra a qual grupo "mestre" ele pertence
+    original_to_master_map = {}
+    for original_name, cleaned_name in cleaned_masters.items():
+        # Usa fuzzywuzzy para encontrar a melhor correspondência na lista de mestres
+        best_match, score = process.extractOne(cleaned_name, master_list, scorer=fuzz.WRatio)
         if score >= threshold:
-            # Se a correspondência for boa, usa o representante daquele grupo
-            name_map[original_name] = cleaned_to_rep_map[best_match]
+            original_to_master_map[original_name] = best_match
         else:
-            # Senão, o nome é seu próprio representante
-            name_map[original_name] = original_name
+            original_to_master_map[original_name] = cleaned_name # É seu próprio mestre
 
-    # 5. Aplica o mapa à série original
-    return name_series.map(name_map)
+    # 3. Inverte o mapa para agrupar: {mestre -> [lista de nomes originais]}
+    master_to_originals_map = {}
+    for original, master in original_to_master_map.items():
+        if master not in master_to_originals_map:
+            master_to_originals_map[master] = []
+        master_to_originals_map[master].append(original)
+
+    # 4. Para cada grupo, elege o representante (a forma original mais comum)
+    final_map = {}
+    for master, originals_in_group in master_to_originals_map.items():
+        # Conta a frequência dos nomes originais neste grupo
+        group_counts = name_series[name_series.isin(originals_in_group)].value_counts()
+        if not group_counts.empty:
+            representative = group_counts.index[0]
+        else:
+            representative = originals_in_group[0] # Fallback
+        
+        # Mapeia todos os nomes originais do grupo para o representante final
+        for original in originals_in_group:
+            final_map[original] = representative
+            
+    # 5. Aplica o mapa final à série original
+    return name_series.map(final_map)
 
 
 def generate_time_options():
