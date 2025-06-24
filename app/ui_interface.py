@@ -71,7 +71,7 @@ def vehicle_access_interface():
     col_main, col_sidebar = st.columns([2, 1])
     with col_main:
         st.header("Painel de Registro")
-        unique_names = sorted(df["Nome"].unique()) if "Nome" in df.columns else []
+        unique_names = sorted(list(df["Nome"].unique())) if "Nome" in df.columns else []
         search_options = ["--- Novo Cadastro ---"] + unique_names
         selected_name = st.selectbox("Busque por um nome ou selecione 'Novo Cadastro':", options=search_options, index=0, key="person_selector")
         status, latest_record = get_person_status(selected_name, df)
