@@ -48,6 +48,13 @@ def validate_cpf(cpf):
     
     return True
     
+def clean_name(name):
+    """Função de limpeza simples para um único nome."""
+    if not isinstance(name, str):
+        return ""
+    # Remove acentos, converte para minúsculas e remove espaços extras
+    name = unidecode(name.lower().strip())
+    return ' '.join(name.split())    
 def normalize_names(name_series: pd.Series, threshold=90) -> pd.Series:
     """
     Normaliza uma série de nomes de forma robusta usando fuzzy matching.
