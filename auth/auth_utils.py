@@ -1,5 +1,3 @@
-# auth/auth_utils.py
-
 import streamlit as st
 from app.operations import SheetOperations  # Esta importação é o problema
 
