@@ -240,26 +240,27 @@ def check_entry(name, data):
         st.error(f"Erro ao verificar registro: {str(e)}")
         return None, f"Erro ao verificar registro: {str(e)}"
 
-def check_blocked_records(df):
+def get_block_info(name):
     """
-    Verifica registros bloqueados.
+    Obtém informações de bloqueio de uma pessoa.
     """
     try:
-        blocked = df[df["Status da Entrada"] == "Bloqueado"]
+        sheet_operations = SheetOperations()
+        df = pd.DataFrame(sheet_operations.carregar_dados()[1:], columns=sheet_operations.carregar_dados()[0])
+        
+        blocked = df[(df["Nome"] == name) & (df["Status da Entrada"] == "Bloqueado")]
         if blocked.empty:
             return None
             
-        info = ""
-        for _, row in blocked.iterrows():
-            info += f"Nome: {row['Nome']}\n"
-            info += f"Motivo: {row['Motivo do Bloqueio']}\n"
-            info += f"Data: {row['Data']}\n"
-            info += "---\n"
-            
-        return info
+        latest = blocked.iloc[0]
+        return {
+            "motivo": latest["Motivo do Bloqueio"],
+            "data": latest["Data"],
+            "aprovador": latest["Aprovador"]
+        }
         
     except Exception as e:
-        st.error(f"Erro ao verificar registros bloqueados: {str(e)}")
+        st.error(f"Erro ao obter informações de bloqueio: {str(e)}")
         return None
 
 def get_block_info(name):
