@@ -1,27 +1,35 @@
-
 import streamlit as st
 import pandas as pd
 import pygsheets
 import random
 from datetime import datetime, timedelta
+import json
+import os
+
 
 class SheetOperations:
     def __init__(self):
         self.credentials = None
         self.spreadsheet_url = None
         try:
-            # Autenticação exclusiva para Streamlit Cloud via st.secrets
+
             if "connections" in st.secrets and "gsheets" in st.secrets["connections"]:
                 creds = st.secrets["connections"]["gsheets"]
                 self.spreadsheet_url = creds["spreadsheet"]
-                self.credentials = pygsheets.authorize(service_account_info=creds)
+
+                service_account_json_str = json.dumps(creds)
+                os.environ["GCP_SERVICE_ACCOUNT_STRING"] = service_account_json_str
+                self.credentials = pygsheets.authorize(service_account_env_var="GCP_SERVICE_ACCOUNT_STRING")
             else:
-                st.error("Credenciais do Google Sheets não encontradas nos Streamlit Secrets.")
+                st.error("Configuração 'connections.gsheets' não encontrada nos Streamlit Secrets.")
+
         except Exception as e:
             st.error(f"Erro crítico ao conectar com o Google Sheets via Secrets: {e}")
 
     def carregar_dados_aba(self, aba_name):
-        if not self.credentials: return None
+        if not self.credentials:
+            st.warning("Não foi possível conectar ao Google Sheets.")
+            return None
         try:
             archive = self.credentials.open_by_url(self.spreadsheet_url)
             aba = archive.worksheet_by_title(aba_name)
@@ -29,17 +37,15 @@ class SheetOperations:
             if not all_values: return []
             
             header = all_values[0]
-            # Filtra cabeçalhos vazios para evitar colunas duplicadas
             valid_indices = [i for i, h in enumerate(header) if h and h.strip()]
             valid_header = [header[i] for i in valid_indices]
             
-            data = []
-            for row in all_values[1:]:
-                # Garante que cada linha tenha o número correto de colunas válidas
-                filtered_row = [row[i] if i < len(row) else '' for i in valid_indices]
-                data.append(filtered_row)
+            data = [[row[i] if i < len(row) else '' for i in valid_indices] for row in all_values[1:]]
             
             return [valid_header] + data
+        except pygsheets.exceptions.WorksheetNotFound:
+             st.error(f"Aba da planilha '{aba_name}' não foi encontrada.")
+             return None
         except Exception as e:
             st.error(f"Erro ao carregar dados da aba '{aba_name}': {e}")
             return None
@@ -70,16 +76,13 @@ class SheetOperations:
             aba = archive.worksheet_by_title('acess')
             cell_list = aba.find(str(id_registro), matchCase=True, in_column=1)
             if cell_list:
-                row_index = cell_list[0].row
-                aba.update_row(row_index, [str(id_registro)] + updated_data_list)
+                aba.update_row(cell_list[0].row, [str(id_registro)] + updated_data_list)
                 return True
             return False
         except pygsheets.exceptions.CellNotFound:
-            st.warning(f"Não foi possível encontrar o registro com ID {id_registro} para editar.")
             return False
         except Exception as e:
-            st.error(f"Erro ao editar dados: {e}")
-            return False
+            st.error(f"Erro ao editar dados: {e}"); return False
 
     def excluir_dados(self, id_registro):
         if not self.credentials: return False
@@ -88,12 +91,10 @@ class SheetOperations:
             aba = archive.worksheet_by_title('acess')
             cell_list = aba.find(str(id_registro), matchCase=True, in_column=1)
             if cell_list:
-                aba.delete_rows(cell_list[0].row)
-                return True
+                aba.delete_rows(cell_list[0].row); return True
             return False
         except Exception as e:
-            st.error(f"Erro ao excluir dados: {e}")
-            return False
+            st.error(f"Erro ao excluir dados: {e}"); return False
 
 # --- FUNÇÕES PÚBLICAS (SINGLETON) ---
 @st.cache_resource
@@ -104,20 +105,16 @@ def load_data_from_sheets():
     ops = get_sheet_ops()
     data = ops.carregar_dados_aba('acess')
     if data:
-        header = data[0]
-        rows = data[1:]
-        st.session_state.df_acesso_veiculos = pd.DataFrame(rows, columns=header).fillna("")
+        st.session_state.df_acesso_veiculos = pd.DataFrame(data[1:], columns=data[0]).fillna("")
     else:
         st.session_state.df_acesso_veiculos = pd.DataFrame()
 
 def get_aprovadores():
-    ops = get_sheet_ops()
-    return ops.carregar_dados_aprovadores()
+    return get_sheet_ops().carregar_dados_aprovadores()
 
 def add_record(name, cpf, placa, marca_carro, horario_entrada, data, empresa, status, motivo, aprovador):
     ops = get_sheet_ops()
     first_reg_date = data if status == "Autorizado" else ""
-    # Garante que o número de colunas corresponda ao esperado pela planilha (12 colunas, sem o ID)
     new_data = [name, cpf, placa, marca_carro, horario_entrada, "", data, empresa, status, motivo, aprovador, first_reg_date]
     ops.adc_dados(new_data)
     return True
@@ -132,7 +129,7 @@ def update_exit_time(name, exit_date_str, exit_time_str):
         df = pd.DataFrame(all_data[1:], columns=header)
         
         open_records = df[(df["Nome"] == name) & ((df["Horário de Saída"] == "") | pd.isna(df["Horário de Saída"]))]
-        if open_records.empty: return False, "Nenhum registro em aberto encontrado."
+        if open_records.empty: return False, "Nenhum registro em aberto."
         
         open_records.loc[:, 'Data_dt'] = pd.to_datetime(open_records['Data'], format='%d/%m/%Y', errors='coerce')
         record_to_update = open_records.sort_values(by='Data_dt', ascending=False).iloc[0]
@@ -147,38 +144,23 @@ def update_exit_time(name, exit_date_str, exit_time_str):
         updated_data = original_row[1:]
         exit_time_index = header.index("Horário de Saída") - 1
 
-        # Saída no mesmo dia
         if entry_date.date() >= exit_date.date():
             updated_data[exit_time_index] = exit_time_str
-            if ops.editar_dados(record_id, updated_data):
-                return True, "Saída registrada com sucesso."
+            if ops.editar_dados(record_id, updated_data): return True, "Saída registrada."
             return False, "Falha ao editar registro."
-
-        # Pernoite
         else:
             updated_data[exit_time_index] = "23:59"
             ops.editar_dados(record_id, updated_data)
-
             current_date = entry_date + timedelta(days=1)
             while current_date.date() < exit_date.date():
-                data_pernoite = [
-                    name, record_to_update["CPF"], record_to_update["Placa"],
-                    record_to_update["Marca do Carro"], "00:00", "23:59", current_date.strftime("%d/%m/%Y"),
-                    record_to_update["Empresa"], "Autorizado", "Pernoite", record_to_update.get("Aprovador", ""), ""
-                ]
+                data_pernoite = [name, record_to_update["CPF"], record_to_update["Placa"], record_to_update["Marca do Carro"], "00:00", "23:59", current_date.strftime("%d/%m/%Y"), record_to_update["Empresa"], "Autorizado", "Pernoite", record_to_update.get("Aprovador", ""), ""]
                 ops.adc_dados(data_pernoite)
                 current_date += timedelta(days=1)
-
-            data_final = [
-                name, record_to_update["CPF"], record_to_update["Placa"],
-                record_to_update["Marca do Carro"], "00:00", exit_time_str, exit_date_str,
-                record_to_update["Empresa"], "Autorizado", "Pernoite", record_to_update.get("Aprovador", ""), ""
-            ]
+            data_final = [name, record_to_update["CPF"], record_to_update["Placa"], record_to_update["Marca do Carro"], "00:00", exit_time_str, exit_date_str, record_to_update["Empresa"], "Autorizado", "Pernoite", record_to_update.get("Aprovador", ""), ""]
             ops.adc_dados(data_final)
-            return True, "Saída com pernoite registrada com sucesso."
-
+            return True, "Saída com pernoite registrada."
     except Exception as e:
-        return False, f"Erro inesperado ao registrar saída: {e}"
+        return False, f"Erro ao registrar saída: {e}"
 
 def delete_record(name, data_str):
     ops = get_sheet_ops()
