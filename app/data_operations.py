@@ -13,11 +13,13 @@ def load_data_from_sheets():
         st.error(f"Falha ao carregar dados iniciais: {e}")
         st.session_state.df_acesso_veiculos = pd.DataFrame()
 
-def add_record(name, cpf, placa, marca_carro, horario_entrada, data, empresa, status, motivo, aprovador):
-    """Adiciona um novo registro de acesso."""
+# --- CORREÇÃO APLICADA AQUI ---
+def add_record(name, cpf, placa, marca_carro, horario_entrada, data, empresa, status, motivo, aprovador, first_reg_date=""):
+    """Adiciona um novo registro de acesso, recebendo a data do primeiro registro."""
     try:
         sheet_operations = SheetOperations()
-        first_reg_date = data if status == "Autorizado" else ""
+        # A lógica para decidir a data do primeiro registro é feita na UI.
+        # Esta função apenas recebe o valor e o insere na planilha.
         new_data = [name, cpf, placa, marca_carro, horario_entrada, "", data, empresa, status, motivo, aprovador, first_reg_date]
         sheet_operations.adc_dados(new_data)
         return True
@@ -41,7 +43,6 @@ def update_exit_time(name, exit_date_str, exit_time_str):
         entry_date = datetime.strptime(record_to_update["Data"], "%d/%m/%Y")
         exit_date = datetime.strptime(exit_date_str, "%d/%m/%Y")
 
-        # Caso 1: Saída no mesmo dia
         if entry_date.date() == exit_date.date():
             original_row = next((row for row in all_data if str(row[0]) == str(record_id)), None)
             if original_row is None: return False, "Registro não encontrado para edição."
@@ -52,10 +53,8 @@ def update_exit_time(name, exit_date_str, exit_time_str):
             if sheet_operations.editar_dados(record_id, updated_data):
                 return True, "Horário de saída atualizado com sucesso."
             return False, "Falha ao editar na planilha."
-
-        # Caso 2: Pernoite (saída em dia diferente)
         else:
-            # 1. Fecha o registro do dia da entrada às 23:59
+            # Pernoite
             original_row = next((row for row in all_data if str(row[0]) == str(record_id)), None)
             header = all_data[0]
             exit_time_index = header.index("Horário de Saída")
@@ -63,19 +62,15 @@ def update_exit_time(name, exit_date_str, exit_time_str):
             updated_data[exit_time_index - 1] = "23:59"
             sheet_operations.editar_dados(record_id, updated_data)
 
-            # 2. Cria registros para dias intermediários
             current_date = entry_date + timedelta(days=1)
             while current_date.date() < exit_date.date():
-                intermediate_data = [name, record_to_update.get("CPF", ""), "", "", "00:00", "23:59", current_date.strftime("%d/%m/%Y"), record_to_update.get("Empresa", ""), "Autorizado", "", record_to_update.get("Aprovador", ""), record_to_update.get("Data do Primeiro Registro", "")]
+                intermediate_data = [name, record_to_update.get("CPF", ""), "", "", "00:00", "23:59", current_date.strftime("%d/%m/%Y"), record_to_update.get("Empresa", ""), "Autorizado", "", record_to_update.get("Aprovador", ""), ""]
                 sheet_operations.adc_dados(intermediate_data)
                 current_date += timedelta(days=1)
 
-            # 3. Cria registro final para o dia da saída
-            final_data = [name, record_to_update.get("CPF", ""), "", "", "00:00", exit_time_str, exit_date_str, record_to_update.get("Empresa", ""), "Autorizado", "", record_to_update.get("Aprovador", ""), record_to_update.get("Data do Primeiro Registro", "")]
+            final_data = [name, record_to_update.get("CPF", ""), "", "", "00:00", exit_time_str, exit_date_str, record_to_update.get("Empresa", ""), "Autorizado", "", record_to_update.get("Aprovador", ""), ""]
             sheet_operations.adc_dados(final_data)
-
             return True, "Registros de pernoite atualizados com sucesso."
-
     except Exception as e:
         return False, f"Erro ao atualizar horário de saída: {e}"
 
