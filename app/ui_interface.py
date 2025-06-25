@@ -178,12 +178,7 @@ def vehicle_access_interface():
                         st.warning(f"Nenhum registro encontrado para {person_to_delete}.")
     
     with st.expander("Visualizar todos os registros"):
-        if 'Data_Ordenacao' in df.columns:
-            st.dataframe(df.drop(columns=['Data_Ordenacao']), use_container_width=True, hide_index=True)
-        else:
-            # Fallback caso a coluna de ordenação não exista por algum motivo
-            st.dataframe(df, use_container_width=True, hide_index=True)
-
+        st.dataframe(df.fillna(""), use_container_width=True, hide_index=True)
 
 
 
