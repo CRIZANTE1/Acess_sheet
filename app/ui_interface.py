@@ -39,7 +39,6 @@ def show_people_inside(df, sheet_operations):
                     if success:
                         st.success(f"Saída de {row['Nome']} registrada!")
                         
-                        # OTIMIZAÇÃO: Atualiza o DataFrame em memória
                         df_memoria = st.session_state.df_acesso_veiculos
                         idx_to_update = df_memoria[df_memoria['ID'] == record_id].index
                         if not idx_to_update.empty:
@@ -69,7 +68,6 @@ def vehicle_access_interface():
         except Exception as e:
             st.error(f"Erro ao carregar o vídeo: {e}")
     
-    # Carrega os dados se não estiverem na sessão
     if 'df_acesso_veiculos' not in st.session_state or st.session_state.df_acesso_veiculos.empty:
         data = sheet_operations.carregar_dados()
         st.session_state.df_acesso_veiculos = pd.DataFrame(data[1:], columns=data[0]).fillna("") if data else pd.DataFrame()
@@ -77,7 +75,6 @@ def vehicle_access_interface():
     df = st.session_state.df_acesso_veiculos
     aprovadores_autorizados = sheet_operations.carregar_dados_aprovadores()
 
-    # Verifica e exibe bloqueios
     blocked_info = check_blocked_records(df)
     if blocked_info: 
         st.error("Atenção! Pessoas com bloqueio ativo:\n\n" + blocked_info)
@@ -90,7 +87,6 @@ def vehicle_access_interface():
         selected_name = st.selectbox("Busque por um nome ou selecione 'Novo Cadastro':", options=search_options, index=0, key="person_selector")
         status, latest_record = get_person_status(selected_name, df)
         
-        # Lógica para pessoa DENTRO
         if status == "Dentro":
             st.info(f"**{selected_name}** está **DENTRO** da unidade.")
             st.write(f"**Entrada em:** {latest_record['Data']} às {latest_record['Horário de Entrada']}")
@@ -100,7 +96,6 @@ def vehicle_access_interface():
                 if success:
                     st.success(message)
                     
-                    # OTIMIZAÇÃO: Atualiza o DataFrame em memória
                     df_memoria = st.session_state.df_acesso_veiculos
                     record_id = latest_record.get("ID")
                     if record_id:
@@ -114,7 +109,6 @@ def vehicle_access_interface():
                 else: 
                     st.error(message)
 
-        # Lógica para pessoa FORA
         elif status == "Fora":
             st.success(f"**{selected_name}** está **FORA** da unidade.")
             st.write(f"**Última saída em:** {latest_record.get('Data', 'N/A')} às {latest_record.get('Horário de Saída', 'N/A')}")
@@ -128,7 +122,6 @@ def vehicle_access_interface():
                     if add_record(name=selected_name, cpf=str(latest_record.get("CPF", "")), placa=placa, marca_carro=str(latest_record.get("Marca do Carro", "")), horario_entrada=now.strftime("%H:%M"), data=now.strftime("%d/%m/%Y"), empresa=empresa, status="Autorizado", motivo="", aprovador=aprovador):
                         st.success(f"Nova entrada de {selected_name} registrada!"); st.rerun()
 
-        # Lógica para NOVO cadastro
         elif status == "Novo":
             st.info("Pessoa não encontrada. Preencha o formulário.")
             with st.form(key="new_visitor_form"):
@@ -149,14 +142,11 @@ def vehicle_access_interface():
                         if add_record(name=name, cpf=format_cpf(cpf), placa=placa, marca_carro=marca_carro, horario_entrada=now.strftime("%H:%M"), data=now.strftime("%d/%m/%Y"), empresa=empresa, status=status_entrada, motivo=motivo_bloqueio, aprovador=aprovador):
                             st.success(f"Novo registro para {name} criado!"); st.rerun()
 
-    # Barra lateral
     with col_sidebar:
         if not df.empty: 
             show_people_inside(df, sheet_operations)
     
     st.divider()
-
-    # Ferramentas de gerenciamento
     with st.expander("Gerenciamento de Registros (Bloquear, Deletar)"):
         st.warning("Use para ações administrativas como bloquear ou deletar registros incorretos.")
         col1, col2 = st.columns(2)
@@ -187,7 +177,6 @@ def vehicle_access_interface():
                     else:
                         st.warning(f"Nenhum registro encontrado para {person_to_delete}.")
     
-    # --- CÓDIGO RESTAURADO ---
     with st.expander("Visualizar todos os registros"):
         st.dataframe(df.fillna(""), use_container_width=True, hide_index=True)
 
