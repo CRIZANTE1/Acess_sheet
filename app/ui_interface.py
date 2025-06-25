@@ -1,3 +1,5 @@
+# app/ui_interface.py
+
 import streamlit as st
 import pandas as pd
 from app.data_operations import add_record, update_exit_time, delete_record, check_blocked_records
@@ -38,14 +40,8 @@ def show_people_inside(df, sheet_operations):
                     success, message = update_exit_time(row['Nome'], now.strftime("%d/%m/%Y"), now.strftime("%H:%M"))
                     if success:
                         st.success(f"Saída de {row['Nome']} registrada!")
-                        
-                        df_memoria = st.session_state.df_acesso_veiculos
-                        idx_to_update = df_memoria[df_memoria['ID'] == record_id].index
-                        if not idx_to_update.empty:
-                            df_memoria.loc[idx_to_update, 'Horário de Saída'] = now.strftime("%H:%M")
-                            st.session_state.df_acesso_veiculos = df_memoria
-                        
-                        st.rerun() # Rerun rápido, sem recarregar a planilha
+                        # SOLUÇÃO: Força a recarga completa dos dados na próxima execução
+                        st.rerun()
                     else: 
                         st.error(message)
 
@@ -68,11 +64,16 @@ def vehicle_access_interface():
         except Exception as e:
             st.error(f"Erro ao carregar o vídeo: {e}")
     
-    if 'df_acesso_veiculos' not in st.session_state or st.session_state.df_acesso_veiculos.empty:
-        data = sheet_operations.carregar_dados()
-        st.session_state.df_acesso_veiculos = pd.DataFrame(data[1:], columns=data[0]).fillna("") if data else pd.DataFrame()
+    data = sheet_operations.carregar_dados()
+    if data:
+        df = pd.DataFrame(data[1:], columns=data[0]).fillna("")
+        # Ordena os dados para que o mais recente sempre apareça primeiro
+        df['Data_dt'] = pd.to_datetime(df['Data'], format='%d/%m/%Y', errors='coerce')
+        df = df.sort_values(by=['Data_dt', 'Horário de Entrada'], ascending=[False, False]).drop(columns=['Data_dt'])
+    else:
+        df = pd.DataFrame()
+    st.session_state.df_acesso_veiculos = df # Armazena a versão mais recente na sessão
         
-    df = st.session_state.df_acesso_veiculos
     aprovadores_autorizados = sheet_operations.carregar_dados_aprovadores()
 
     blocked_info = check_blocked_records(df)
@@ -94,20 +95,8 @@ def vehicle_access_interface():
                 now = get_sao_paulo_time()
                 success, message = update_exit_time(selected_name, now.strftime("%d/%m/%Y"), now.strftime("%H:%M"))
                 if success:
-                    st.success(message)
-                    
-                    df_memoria = st.session_state.df_acesso_veiculos
-                    record_id = latest_record.get("ID")
-                    if record_id:
-                        idx_to_update = df_memoria[df_memoria['ID'] == record_id].index
-                        if not idx_to_update.empty:
-                            df_memoria.loc[idx_to_update, 'Horário de Saída'] = now.strftime("%H:%M")
-                            st.session_state.df_acesso_veiculos = df_memoria
-                    
-                    st.session_state.person_selector = "--- Novo Cadastro ---"
-                    st.rerun()
-                else: 
-                    st.error(message)
+                    st.success(message); st.rerun()
+                else: st.error(message)
 
         elif status == "Fora":
             st.success(f"**{selected_name}** está **FORA** da unidade.")
@@ -147,6 +136,7 @@ def vehicle_access_interface():
             show_people_inside(df, sheet_operations)
     
     st.divider()
+
     with st.expander("Gerenciamento de Registros (Bloquear, Deletar)"):
         st.warning("Use para ações administrativas como bloquear ou deletar registros incorretos.")
         col1, col2 = st.columns(2)
@@ -158,7 +148,7 @@ def vehicle_access_interface():
                 if st.button("Aplicar Bloqueio", key="apply_block"):
                     if motivo and not df[df["Nome"] == person_to_block].empty:
                         now = get_sao_paulo_time()
-                        last_record = df[df["Nome"] == person_to_block].sort_values("Data").iloc[-1]
+                        last_record = df[df["Nome"] == person_to_block].iloc[0]
                         if add_record(name=str(person_to_block), cpf=str(last_record.get("CPF", "")), placa="", marca_carro="", horario_entrada=now.strftime("%H:%M"), data=now.strftime("%d/%m/%Y"), empresa=str(last_record.get("Empresa", "")), status="Bloqueado", motivo=motivo, aprovador=""):
                             st.success(f"{person_to_block} bloqueado com sucesso."); st.rerun()
                     else: st.error("O motivo é obrigatório ou a pessoa não tem registros.")
@@ -169,8 +159,7 @@ def vehicle_access_interface():
                 if st.button("Deletar Último Registro", key="apply_delete", type="secondary"):
                     records = df[df["Nome"] == person_to_delete].copy()
                     if not records.empty:
-                        records['Data_dt'] = pd.to_datetime(records['Data'], format='%d/%m/%Y', errors='coerce')
-                        last_record = records.sort_values(by='Data_dt', ascending=False).iloc[0]
+                        last_record = records.iloc[0]
                         if delete_record(person_to_delete, last_record['Data']):
                             st.success(f"Último registro de {person_to_delete} deletado."); st.rerun()
                         else: st.error("Falha ao deletar registro.")
@@ -178,21 +167,8 @@ def vehicle_access_interface():
                         st.warning(f"Nenhum registro encontrado para {person_to_delete}.")
     
     with st.expander("Visualizar todos os registros"):
-        if not df.empty:
-            # Cria uma cópia para a exibição, garantindo que não afete o estado principal
-            df_to_show = df.copy()
-
-            # Converte a coluna de data para o formato datetime, tratando erros
-            df_to_show['Data_para_Ordenar'] = pd.to_datetime(df_to_show['Data'], format='%d/%m/%Y', errors='coerce')
-            
-            # Ordena pelos mais recentes primeiro
-            df_sorted = df_to_show.sort_values(by=['Data_para_Ordenar', 'Horário de Entrada'], ascending=[False, False])
-            
-            # Remove a coluna auxiliar e exibe
-            st.dataframe(df_sorted.drop(columns=['Data_para_Ordenar']), use_container_width=True, hide_index=True)
-        else:
-            st.info("Nenhum registro para exibir.")
-
+        # A ordenação já foi feita no início. Aqui apenas exibimos.
+        st.dataframe(df.fillna(""), use_container_width=True, hide_index=True)
 
 
 
