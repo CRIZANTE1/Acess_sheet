@@ -178,7 +178,20 @@ def vehicle_access_interface():
                         st.warning(f"Nenhum registro encontrado para {person_to_delete}.")
     
     with st.expander("Visualizar todos os registros"):
-        st.dataframe(df.fillna(""), use_container_width=True, hide_index=True)
+        if not df.empty:
+            # Cria uma cópia para a exibição, garantindo que não afete o estado principal
+            df_to_show = df.copy()
+
+            # Converte a coluna de data para o formato datetime, tratando erros
+            df_to_show['Data_para_Ordenar'] = pd.to_datetime(df_to_show['Data'], format='%d/%m/%Y', errors='coerce')
+            
+            # Ordena pelos mais recentes primeiro
+            df_sorted = df_to_show.sort_values(by=['Data_para_Ordenar', 'Horário de Entrada'], ascending=[False, False])
+            
+            # Remove a coluna auxiliar e exibe
+            st.dataframe(df_sorted.drop(columns=['Data_para_Ordenar']), use_container_width=True, hide_index=True)
+        else:
+            st.info("Nenhum registro para exibir.")
 
 
 
