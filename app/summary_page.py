@@ -90,6 +90,7 @@ def summary_page():
     st.title("Resumo do Controle de Acesso")
     st.write("Aqui você pode visualizar um resumo dos dados de acesso de veículos.")
 
+    # --- Seção de Filtros (sem alterações) ---
     col1, col2 = st.columns(2)
     with col1:
         meses = {get_month_name(i): i for i in range(1, 13)}
@@ -100,32 +101,48 @@ def summary_page():
 
     mes_numero = meses[mes_selecionado]
 
+    # --- Abas de Visualização (sem alterações) ---
     tab1, tab2 = st.tabs(["Estatísticas Gerais", "Consulta por Nome"])
     
     with tab1:
         st.subheader(f"Estatísticas de {mes_selecionado} de {ano_selecionado}")
         month_consult(mes_numero, ano_selecionado)
-        st.subheader("Contador de Redução de Papel")
+        
+        st.divider() # Adiciona um separador visual
+        
+        # --- (CORRIGIDO) Contador de Redução de Papel ---
+        st.subheader("Impacto Ambiental da Digitalização")
+
         if "df_acesso_veiculos" in st.session_state:
-            num_registros = len(st.session_state.df_acesso_veiculos)
+            total_registros = len(st.session_state.df_acesso_veiculos)
         else:
-            num_registros = 0
+            total_registros = 0
             st.warning("Dados de acesso não encontrados.")
-        folhas_economizadas = num_registros
-        arvores_salvas = folhas_economizadas // 8000
-        df_reducao_papel = pd.DataFrame({
-            "Métrica": ["Documentos Digitalizados (Registros)", "Economia de Papel (Folhas)", "Árvores Salvas (Estimativa)"],
-            "Valor": [f"{num_registros}", f"{folhas_economizadas}", f"{arvores_salvas}"]
-        })
-        st.table(df_reducao_papel)
+
+        # Lógica de cálculo ajustada:
+        # Premissa 1: Cada folha de papel físico continha 10 registros.
+        # Premissa 2: 1 árvore produz aproximadamente 8.000 folhas de papel.
+        registros_por_folha = 10
+        folhas_por_arvore = 8000
+
+        folhas_economizadas = total_registros // registros_por_folha
+        
+        # Para o cálculo de árvores, usamos o número de folhas, não o de registros.
+        # Usamos a divisão de ponto flutuante para mostrar frações de árvores salvas.
+        arvores_salvas = folhas_economizadas / folhas_por_arvore
+
+        # Exibição em colunas para um visual mais limpo
+        col_a, col_b, col_c = st.columns(3)
+        col_a.metric(label="Registros Digitais", value=f"{total_registros:,}".replace(",", "."))
+        col_b.metric(label="Folhas de Papel Economizadas", value=f"{folhas_economizadas:,}".replace(",", "."))
+        
+        # Formata o número de árvores salvas para ter 3 casas decimais
+        col_c.metric(label="Árvores Salvas (Estimativa)", value=f"{arvores_salvas:.3f}".replace(".", ","))
+
+        st.caption(f"Cálculo baseado na premissa de {registros_por_folha} registros por folha e {folhas_por_arvore:,} folhas por árvore.".replace(",", "."))
         
     with tab2:
         st.subheader(f"Consulta de Acessos por Nome - {mes_selecionado} de {ano_selecionado}")
         consulta_nome_mes(mes_numero, ano_selecionado)
 
     st.info("Para realizar edições ou solicitar novas funcionalidades, por favor, entre em contato com o desenvolvedor.")
-
-    # Bloco problemático removido. A navegação é feita pela barra lateral.
-    # if st.button("Voltar para Página Principal"):
-    #     st.session_state.pagina_atual = 'principal'
-    #     st.rerun()
