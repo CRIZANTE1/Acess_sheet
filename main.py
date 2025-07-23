@@ -22,7 +22,6 @@ def main():
         
         page_options = []
         if user_is_admin:
-            # Renomeado "Configurações do Sistema" para "Painel Administrativo"
             page_options.extend(["Controle de Acesso", "Painel Administrativo", "Resumo"])
         else:
             page_options.extend(["Controle de Acesso", "Resumo"])
