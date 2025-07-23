@@ -30,7 +30,6 @@ def main():
         
         if page == "Controle de Acesso":
             vehicle_access_interface()
-        # Atualizado para corresponder à nova opção de menu
         elif page == "Painel Administrativo":
             admin_page()
         elif page == "Resumo": 
