@@ -22,7 +22,8 @@ def main():
         
         page_options = []
         if user_is_admin:
-            page_options.extend(["Controle de Acesso", "Configurações do Sistema", "Resumo"])
+            # Renomeado "Configurações do Sistema" para "Painel Administrativo"
+            page_options.extend(["Controle de Acesso", "Painel Administrativo", "Resumo"])
         else:
             page_options.extend(["Controle de Acesso", "Resumo"])
             
@@ -30,7 +31,8 @@ def main():
         
         if page == "Controle de Acesso":
             vehicle_access_interface()
-        elif page == "Configurações do Sistema":
+        # Atualizado para corresponder à nova opção de menu
+        elif page == "Painel Administrativo":
             admin_page()
         elif page == "Resumo": 
             summary_page()
@@ -41,6 +43,5 @@ def main():
 
 if __name__ == "__main__":
     main()
-
 
 
