@@ -137,20 +137,22 @@ class SheetOperations:
             archive = self.credentials.open_by_url(self.my_archive_google_sheets)
             aba = archive.worksheet_by_title(aba_name)
             
-         
             all_values = aba.get_all_values()
             
             row_to_delete_index = -1
             for i, row in enumerate(all_values[1:]):
                 if row and str(row[0]) == str(id_to_delete):
+                    # i+2 porque começamos no índice 1 e as linhas da planilha começam em 1 (i=0 -> linha 2)
                     row_to_delete_index = i + 2 
                     break # Encontrou, pode parar de procurar
 
             if row_to_delete_index != -1:
+                # Se encontrou a linha, deleta pelo seu índice
                 aba.delete_rows(row_to_delete_index)
                 logging.info(f"Dados do ID {id_to_delete} excluídos com sucesso da aba '{aba_name}'.")
                 return True
             else:
+                # Se o loop terminar e não encontrar, registra o erro
                 logging.error(f"ID {id_to_delete} não encontrado na aba '{aba_name}'.")
                 st.warning(f"Não foi possível encontrar o registro com ID {id_to_delete} para exclusão.")
                 return False
