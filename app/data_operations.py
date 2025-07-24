@@ -159,20 +159,23 @@ def check_blocked_records(df):
         
         latest_status_df = df_sorted.drop_duplicates(subset='Nome', keep='first')
         
-        attention_df = latest_status_df[latest_status_df["Status da Entrada"].isin(["Bloqueado", "Pendente de Aprovação"])]
+        attention_statuses = ["Bloqueado", "Pendente de Aprovação", "Pendente de Liberação da Blocklist"]
+        attention_df = latest_status_df[latest_status_df["Status da Entrada"].isin(attention_statuses)]
         
         if attention_df.empty: return None
         
         info = ""
         for _, row in attention_df.iterrows():
             status = row['Status da Entrada']
-            motivo = row.get('Motivo do Bloqueio', 'N/A')
-            if status == "Pendente de Aprovação":
+            # <<< ALTERAÇÃO AQUI: FORMATA A MENSAGEM PARA O NOVO STATUS >>>
+            if status == "Pendente de Liberação da Blocklist":
+                motivo_display = f"AGUARDANDO APROVAÇÃO EXCEPCIONAL (Solicitante: {row.get('Aprovador', 'N/A')})"
+            elif status == "Pendente de Aprovação":
                 motivo_display = f"Aguardando aprovação do admin (Solicitante: {row.get('Aprovador', 'N/A')})"
-            else:
-                motivo_display = f"Motivo: {motivo}"
+            else: # Bloqueado
+                motivo_display = f"Motivo: {row.get('Motivo do Bloqueio', 'N/A')}"
             
-            info += f"- **{row['Nome']}**: {status} (em {row['Data']}) - {motivo_display}\n"
+            info += f"- **{row['Nome']}**: {status} - {motivo_display}\n"
         return info
     except Exception as e:
         print(f"Erro em check_blocked_records: {e}")
