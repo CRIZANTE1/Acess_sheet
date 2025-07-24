@@ -60,9 +60,10 @@ def vehicle_access_interface():
     """Renderiza a interface principal de controle de acesso."""
     st.title("Controle de Acesso BAERI")
     
-    # Inicializa o controle de processamento para evitar cliques duplos
     if 'processing' not in st.session_state:
         st.session_state.processing = False
+    if 'blocked_attempt' not in st.session_state:
+        st.session_state.blocked_attempt = None
 
     sheet_operations = SheetOperations()
     
@@ -80,7 +81,6 @@ def vehicle_access_interface():
         except Exception as e:
             st.error(f"Erro ao carregar o vídeo: {e}")
     
-    # Lógica de carregamento de dados
     if 'df_acesso_veiculos' not in st.session_state:
         data = sheet_operations.carregar_dados()
         df = pd.DataFrame(data[1:], columns=data[0]).fillna("") if data else pd.DataFrame()
@@ -98,6 +98,13 @@ def vehicle_access_interface():
     col_main, col_sidebar = st.columns([2, 1])
     with col_main:
         st.header("Painel de Registro")
+        
+        if st.session_state.blocked_attempt:
+            b_info = st.session_state.blocked_attempt
+            st.error(f"ACESSO NEGADO: '{b_info['name']}' (empresa: {b_info['company']}) está na blocklist. Motivo: {b_info['reason']}")
+            if st.button("⚠️ Solicitar Liberação Excepcional", key="override_dialog_button"):
+                st.session_state.blocked_attempt = None
+                request_blocklist_override_dialog(b_info['name'], b_info['company'])
         
         unique_names = sorted(df["Nome"].unique()) if "Nome" in df.columns else []
         search_options = ["--- Novo Cadastro ---"] + unique_names
@@ -147,107 +154,69 @@ def vehicle_access_interface():
         elif status == "Fora":
             st.success(f"**{selected_name}** está **FORA** da unidade.")
             st.write(f"**Última saída em:** {latest_record.get('Data', 'N/A')} às {latest_record.get('Horário de Saída', 'N/A')}")
-            
-            with st.container(border=True):
-                st.write("Registrar nova entrada:")
-                placa = st.text_input("Placa", value=latest_record.get("Placa", ""), key="fora_placa")
-                empresa = st.text_input("Empresa", value=latest_record.get("Empresa", ""), key="fora_empresa")
-                aprovador = st.selectbox("Aprovador:", options=aprovadores_autorizados, key="fora_aprovador")
-                
-                if st.button(f"▶️ Registrar Entrada de {selected_name}", use_container_width=True, type="primary", disabled=st.session_state.processing):
+            with st.form(key="reentry_form"):
+                placa = st.text_input("Placa", value=str(latest_record.get("Placa", "")))
+                empresa = st.text_input("Empresa", value=str(latest_record.get("Empresa", "")))
+                aprovador = st.selectbox("Aprovador:", options=aprovadores_autorizados)
+                if st.form_submit_button(f"▶️ Registrar Entrada de {selected_name}", use_container_width=True, type="primary", disabled=st.session_state.processing):
+                    st.session_state.processing = True
                     is_blocked, reason = is_entity_blocked(selected_name, empresa)
                     if is_blocked:
-                        log_action("BLOCKED_ACCESS_ATTEMPT", f"Tentativa de '{selected_name}' interceptada.")
-                        request_blocklist_override_dialog(selected_name, empresa)
+                        log_action("BLOCKED_ACCESS_ATTEMPT", f"Tentativa de '{selected_name}' foi interceptada pela blocklist.")
+                        st.session_state.blocked_attempt = {"name": selected_name, "company": empresa, "reason": reason}
                     else:
-                        st.session_state.processing = True
                         now = get_sao_paulo_time()
                         if add_record(name=selected_name, cpf=str(latest_record.get("CPF", "")), placa=placa, marca_carro=str(latest_record.get("Marca do Carro", "")), horario_entrada=now.strftime("%H:%M"), data=now.strftime("%d/%m/%Y"), empresa=empresa, status="Autorizado", motivo="", aprovador=aprovador, first_reg_date=""):
                             log_action("REGISTER_ENTRY", f"Registrou nova entrada para '{selected_name}'. Placa: {placa}.")
                             st.success(f"Nova entrada de {selected_name} registrada!")
                             if 'df_acesso_veiculos' in st.session_state: del st.session_state.df_acesso_veiculos
-                        st.session_state.processing = False
-                        st.rerun()
-        
+                    st.session_state.processing = False
+                    st.rerun()
+
+            if st.session_state.blocked_attempt:
+                b_info = st.session_state.blocked_attempt
+                st.error(f"ACESSO NEGADO: '{b_info['name']}' está na blocklist. Motivo: {b_info['reason']}")
+                if st.button("⚠️ Solicitar Liberação Excepcional", key="override_fora"):
+                    request_blocklist_override_dialog(b_info['name'], b_info['company'])
+                st.session_state.blocked_attempt = None
+
         elif status == "Novo":
             st.info("Pessoa não encontrada. Preencha o formulário.")
-            with st.container(border=True):
-                st.write("**Formulário de Primeiro Acesso**")
-                name = st.text_input("Nome Completo:", key="novo_nome")
-                cpf = st.text_input("CPF:", key="novo_cpf")
-                empresa = st.text_input("Empresa:", key="novo_empresa")
-                aprovador = st.selectbox("Aprovador:", options=aprovadores_autorizados, key="novo_aprovador")
-                placa = st.text_input("Placa (Opcional):", key="novo_placa")
-                marca_carro = st.text_input("Marca (Opcional):", key="novo_marca")
-
-                if st.button("➕ Cadastrar e Registrar Entrada", use_container_width=True, type="primary", disabled=st.session_state.processing):
-                    if not all([name, cpf, empresa, aprovador]):
-                        st.error("Preencha todos os campos obrigatórios.")
-                    elif not validate_cpf(cpf):
-                        st.error("CPF inválido.")
+            with st.form(key="new_visitor_form"):
+                name = st.text_input("Nome Completo:")
+                cpf = st.text_input("CPF:")
+                empresa = st.text_input("Empresa:")
+                aprovador = st.selectbox("Aprovador:", options=aprovadores_autorizados)
+                placa = st.text_input("Placa (Opcional):")
+                marca_carro = st.text_input("Marca (Opcional):")
+                if st.form_submit_button("➕ Cadastrar e Registrar Entrada", use_container_width=True, type="primary", disabled=st.session_state.processing):
+                    st.session_state.processing = True
+                    if not all([name, cpf, empresa, aprovador]): st.error("Preencha todos os campos obrigatórios.")
+                    elif not validate_cpf(cpf): st.error("CPF inválido.")
                     else:
                         is_blocked, reason = is_entity_blocked(name.strip(), empresa.strip())
                         if is_blocked:
-                            log_action("BLOCKED_ACCESS_ATTEMPT", f"Tentativa de '{name.strip()}' interceptada.")
-                            request_blocklist_override_dialog(name.strip(), empresa.strip())
+                            log_action("BLOCKED_ACCESS_ATTEMPT", f"Tentativa de '{name.strip()}' foi interceptada pela blocklist.")
+                            st.session_state.blocked_attempt = {"name": name.strip(), "company": empresa.strip(), "reason": reason}
                         else:
-                            st.session_state.processing = True
                             now = get_sao_paulo_time()
                             if add_record(name=name.strip(), cpf=format_cpf(cpf), placa=placa, marca_carro=marca_carro, horario_entrada=now.strftime("%H:%M"), data=now.strftime("%d/%m/%Y"), empresa=empresa.strip(), status="Autorizado", motivo="", aprovador=aprovador, first_reg_date=now.strftime("%d/%m/%Y")):
                                 log_action("CREATE_RECORD", f"Cadastrou novo visitante: '{name.strip()}'.")
                                 st.success(f"Novo registro para {name} criado com sucesso!")
                                 if 'df_acesso_veiculos' in st.session_state: del st.session_state.df_acesso_veiculos
-                            st.session_state.processing = False
-                            st.rerun()
-
+                    st.session_state.processing = False
+                    st.rerun()
+            
+            if st.session_state.blocked_attempt:
+                b_info = st.session_state.blocked_attempt
+                st.error(f"ACESSO NEGADO: '{b_info['name']}' está na blocklist. Motivo: {b_info['reason']}")
+                if st.button("⚠️ Solicitar Liberação Excepcional", key="override_novo"):
+                    request_blocklist_override_dialog(b_info['name'], b_info['company'])
+                st.session_state.blocked_attempt = None
+            
     with col_sidebar:
         if not df.empty: 
-            show_people_inside(df, sheet_operations)
-    
-    st.divider()
-
-    if is_admin():
-        with st.expander("Gerenciamento de Registros (Ações Administrativas)"):
-            st.warning("Use com cuidado. As ações aqui são permanentes e afetam o histórico.")
-            col1, col2 = st.columns(2)
-            with col1:
-                st.subheader("Bloquear Pessoa")
-                person_to_block = st.selectbox("Selecione para bloquear:", options=[""] + unique_names, key="block_person", index=0)
-                if person_to_block:
-                    motivo = st.text_input("Motivo do Bloqueio:", key="block_reason")
-                    if st.button("Aplicar Bloqueio", key="apply_block", type="primary", disabled=st.session_state.processing):
-                        st.session_state.processing = True
-                        if motivo and not df[df["Nome"] == person_to_block].empty:
-                            now = get_sao_paulo_time()
-                            last_record = df[df["Nome"] == person_to_block].iloc[0]
-                            if add_record(name=str(person_to_block), cpf=str(last_record.get("CPF", "")), placa="", marca_carro="", horario_entrada=now.strftime("%H:%M"), data=now.strftime("%d/%m/%Y"), empresa=str(last_record.get("Empresa", "")), status="Bloqueado", motivo=motivo, aprovador="Admin", first_reg_date=""):
-                                log_action("BLOCK_USER", f"Bloqueou o usuário '{person_to_block}'. Motivo: {motivo}.")
-                                st.success(f"{person_to_block} foi bloqueado com sucesso.")
-                                if 'df_acesso_veiculos' in st.session_state: del st.session_state.df_acesso_veiculos
-                        else:
-                            st.error("O motivo é obrigatório e a pessoa deve ter pelo menos um registro anterior.")
-                        st.session_state.processing = False
-                        st.rerun()
-            with col2:
-                st.subheader("Deletar Último Registro")
-                person_to_delete = st.selectbox("Selecione a pessoa para deletar o último registro:", options=[""] + unique_names, key="delete_person", index=0)
-                if person_to_delete:
-                    if st.button("Deletar Último Registro", key="apply_delete", type="secondary", disabled=st.session_state.processing):
-                        st.session_state.processing = True
-                        records = df[df["Nome"] == person_to_delete].copy()
-                        if not records.empty:
-                            last_record_id = records.iloc[0]['ID']
-                            if delete_record_by_id(last_record_id):
-                                log_action("DELETE_RECORD", f"Deletou o último registro de '{person_to_delete}' (ID: {last_record_id}).")
-                                st.success(f"Último registro de {person_to_delete} deletado com sucesso.")
-                                if 'df_acesso_veiculos' in st.session_state: del st.session_state.df_acesso_veiculos
-                            else: st.error("Falha ao deletar o registro.")
-                        else: st.warning(f"Nenhum registro encontrado para {person_to_delete}.")
-                        st.session_state.processing = False
-                        st.rerun()
-    
-    with st.expander("Visualizar todos os registros"):
-        st.dataframe(df.fillna(""), use_container_width=True, hide_index=True)
+            show_people_inside(df, sheet_operations) ajuste e me forneca completa a função
 
 
 
