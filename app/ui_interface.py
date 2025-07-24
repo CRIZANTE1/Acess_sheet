@@ -157,7 +157,10 @@ def vehicle_access_interface():
                         now = get_sao_paulo_time()
                         if add_record(name=selected_name, cpf=str(latest_record.get("CPF", "")), placa=placa, marca_carro=str(latest_record.get("Marca do Carro", "")), horario_entrada=now.strftime("%H:%M"), data=now.strftime("%d/%m/%Y"), empresa=empresa, status="Autorizado", motivo="", aprovador=aprovador, first_reg_date=""):
                             log_action("REGISTER_ENTRY", f"Registrou nova entrada para '{selected_name}'. Placa: {placa}.")
-                            st.success(f"Nova entrada de {selected_name} registrada!"); st.rerun()
+                            st.success(f"Nova entrada de {selected_name} registrada!")
+                    
+                    st.session_state.processing = False
+                    st.rerun()        
 
         elif status == "Novo":
             st.info("Pessoa não encontrada. Preencha o formulário.")
@@ -175,7 +178,6 @@ def vehicle_access_interface():
                     elif not validate_cpf(cpf):
                         st.error("CPF inválido. Verifique os dígitos.")
                     else:
-                        # <<< ALTERAÇÃO AQUI: VERIFICAÇÃO DA BLOCKLIST >>>
                         is_blocked, reason = is_entity_blocked(name.strip(), empresa.strip())
                         if is_blocked:
                             st.error(f"ACESSO NEGADO: Acesso permanentemente bloqueado. Motivo: {reason}")
@@ -184,7 +186,11 @@ def vehicle_access_interface():
                             now = get_sao_paulo_time()
                             if add_record(name=name.strip(), cpf=format_cpf(cpf), placa=placa, marca_carro=marca_carro, horario_entrada=now.strftime("%H:%M"), data=now.strftime("%d/%m/%Y"), empresa=empresa.strip(), status="Autorizado", motivo="", aprovador=aprovador, first_reg_date=now.strftime("%d/%m/%Y")):
                                 log_action("CREATE_RECORD", f"Cadastrou novo visitante: '{name.strip()}'.")
-                                st.success(f"Novo registro para {name} criado com sucesso!"); st.rerun()
+                                st.success(f"Novo registro para {name} criado com sucesso!")
+                        
+                    st.session_state.processing = False
+                    st.rerun()
+            
 
     with col_sidebar:
         if not df.empty: 
