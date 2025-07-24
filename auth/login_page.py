@@ -1,5 +1,6 @@
 import streamlit as st
 from .auth_utils import is_oidc_available, is_user_logged_in, get_user_display_name
+from app.logger import log_action
 
 def show_login_page():
     """Mostra a página de login"""
@@ -44,11 +45,11 @@ def show_logout_button():
     """Mostra o botão de logout no sidebar"""
     with st.sidebar:
         if st.button("Sair do Sistema"):
+            log_action("LOGOUT", "Usuário saiu do sistema.")
             try:
                 st.logout()
+                for key in list(st.session_state.keys()):
+                    del st.session_state[key]
                 st.rerun()
             except Exception as e:
                 st.error(f"Erro ao fazer logout: {str(e)}")
-                for key in list(st.session_state.keys()):
-                    del st.session_state[key]
-                st.rerun() 
