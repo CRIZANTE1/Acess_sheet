@@ -1,5 +1,3 @@
-# --- START OF FILE main.py ---
-
 import streamlit as st
 
 from auth.login_page import show_login_page, show_user_header, show_logout_button
