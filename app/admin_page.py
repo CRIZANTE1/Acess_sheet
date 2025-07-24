@@ -101,8 +101,8 @@ def display_blocklist_management(sheet_ops):
                     st.success(f"{block_type}(s) bloqueada(s) com sucesso!")
                     st.cache_data.clear()
                     st.rerun()
-
     st.divider()
+
     st.subheader("Remover Bloqueios (Liberar Acesso)")
     blocklist_df = get_blocklist()
 
@@ -120,7 +120,9 @@ def display_blocklist_management(sheet_ops):
                 st.warning("Nenhum bloqueio selecionado para liberação.")
             else:
                 ids_to_unblock = [options_to_unblock[item] for item in selections_formatted]
-                if remove_from_blocklist(ids_to_unblock):
+                success = remove_from_blocklist(ids_to_unblock)
+                
+                if success:
                     st.success("Bloqueios removidos com sucesso!")
                     st.cache_data.clear()
                     st.rerun()
@@ -166,7 +168,7 @@ def admin_page():
         st.subheader("Status do Sistema")
         st.json({
             "sistema": "Controle de Acesso de Pessoas e Veículos",
-            "versão": "2.4.0", # Versão atualizada com gerenciamento de blocklist
+            "versão": "2.4.0", 
             "modo_login": "OIDC (OpenID Connect) com Papéis via Google Sheets",
             "status": "Operacional",
             "Developer": "Cristian Ferreira Carlos",
