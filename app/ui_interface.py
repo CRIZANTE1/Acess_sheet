@@ -5,6 +5,7 @@ from app.data_operations import add_record, update_exit_time, delete_record_by_i
 from app.operations import SheetOperations
 from app.utils import format_cpf, validate_cpf, get_sao_paulo_time
 from auth.auth_utils import get_user_display_name, is_admin
+from app.logger import log_action
 
 def get_person_status(name, df):
     """Verifica o status mais recente de uma pessoa (Dentro, Fora, Bloqueado, Novo)."""
@@ -77,13 +78,10 @@ def vehicle_access_interface():
         except Exception as e:
             st.error(f"Erro ao carregar o vídeo: {e}")
     
-    # Lógica de carregamento e ordenação para garantir que estamos sempre vendo o registro mais recente
+    # Lógica de carregamento e ordenação
     if 'df_acesso_veiculos' not in st.session_state or st.session_state.df_acesso_veiculos.empty:
         data = sheet_operations.carregar_dados()
-        if data:
-            df = pd.DataFrame(data[1:], columns=data[0]).fillna("")
-        else:
-            df = pd.DataFrame()
+        df = pd.DataFrame(data[1:], columns=data[0]).fillna("") if data else pd.DataFrame()
     else:
         df = st.session_state.df_acesso_veiculos
 
@@ -94,7 +92,6 @@ def vehicle_access_interface():
     st.session_state.df_acesso_veiculos = df
         
     aprovadores_autorizados = sheet_operations.carregar_dados_aprovadores()
-
     blocked_info = check_blocked_records(df)
     if blocked_info: 
         st.error("Atenção! Pessoas com restrição de acesso:\n\n" + blocked_info)
@@ -107,7 +104,6 @@ def vehicle_access_interface():
         selected_name = st.selectbox("Busque por um nome ou selecione 'Novo Cadastro':", options=search_options, index=0, key="person_selector")
         
         status, latest_record = get_person_status(selected_name, df)
-        
 
         if status == "Bloqueado":
             status_atual = latest_record.get('Status da Entrada', 'Bloqueado')
@@ -123,6 +119,7 @@ def vehicle_access_interface():
                     now = get_sao_paulo_time()
                     requester_name = get_user_display_name()
                     if add_record(name=selected_name, cpf=str(latest_record.get("CPF", "")), placa="", marca_carro="", horario_entrada=now.strftime("%H:%M"), data=now.strftime("%d/%m/%Y"), empresa=str(latest_record.get("Empresa", "")), status="Pendente de Aprovação", motivo=f"Solicitação para bloqueio: '{motivo}'", aprovador=requester_name, first_reg_date=""):
+                        log_action("REQUEST_ACCESS", f"Solicitou liberação para '{selected_name}'. Motivo: {motivo}")
                         st.success(f"Solicitação para {selected_name} enviada para o administrador!"); st.rerun()
 
         elif status == "Dentro":
@@ -132,13 +129,13 @@ def vehicle_access_interface():
                 now = get_sao_paulo_time()
                 success, message = update_exit_time(selected_name, now.strftime("%d/%m/%Y"), now.strftime("%H:%M"))
                 if success:
+                    log_action("REGISTER_EXIT", f"Registrou saída para '{selected_name}'.")
                     st.success(message); st.rerun()
                 else: st.error(message)
 
         elif status == "Fora":
             st.success(f"**{selected_name}** está **FORA** da unidade.")
             st.write(f"**Última saída em:** {latest_record.get('Data', 'N/A')} às {latest_record.get('Horário de Saída', 'N/A')}")
-            
             
             with st.form(key="reentry_form"):
                 st.write("Registrar nova entrada:")
@@ -148,6 +145,7 @@ def vehicle_access_interface():
                 if st.form_submit_button(f"▶️ Registrar Entrada de {selected_name}", use_container_width=True, type="primary"):
                     now = get_sao_paulo_time()
                     if add_record(name=selected_name, cpf=str(latest_record.get("CPF", "")), placa=placa, marca_carro=str(latest_record.get("Marca do Carro", "")), horario_entrada=now.strftime("%H:%M"), data=now.strftime("%d/%m/%Y"), empresa=empresa, status="Autorizado", motivo="", aprovador=aprovador, first_reg_date=""):
+                        log_action("REGISTER_ENTRY", f"Registrou nova entrada para '{selected_name}'. Placa: {placa}.")
                         st.success(f"Nova entrada de {selected_name} registrada!"); st.rerun()
 
         elif status == "Novo":
@@ -168,6 +166,7 @@ def vehicle_access_interface():
                     else:
                         now = get_sao_paulo_time()
                         if add_record(name=name.strip(), cpf=format_cpf(cpf), placa=placa, marca_carro=marca_carro, horario_entrada=now.strftime("%H:%M"), data=now.strftime("%d/%m/%Y"), empresa=empresa, status="Autorizado", motivo="", aprovador=aprovador, first_reg_date=now.strftime("%d/%m/%Y")):
+                            log_action("CREATE_RECORD", f"Cadastrou novo visitante: '{name.strip()}'.")
                             st.success(f"Novo registro para {name} criado com sucesso!"); st.rerun()
 
     with col_sidebar:
@@ -190,6 +189,7 @@ def vehicle_access_interface():
                             now = get_sao_paulo_time()
                             last_record = df[df["Nome"] == person_to_block].iloc[0]
                             if add_record(name=str(person_to_block), cpf=str(last_record.get("CPF", "")), placa="", marca_carro="", horario_entrada=now.strftime("%H:%M"), data=now.strftime("%d/%m/%Y"), empresa=str(last_record.get("Empresa", "")), status="Bloqueado", motivo=motivo, aprovador="Admin", first_reg_date=""):
+                                log_action("BLOCK_USER", f"Bloqueou o usuário '{person_to_block}'. Motivo: {motivo}.")
                                 st.success(f"{person_to_block} foi bloqueado com sucesso."); st.rerun()
                         else:
                             st.error("O motivo é obrigatório e a pessoa deve ter pelo menos um registro anterior.")
@@ -202,6 +202,7 @@ def vehicle_access_interface():
                         if not records.empty:
                             last_record_id = records.iloc[0]['ID']
                             if delete_record_by_id(last_record_id):
+                                log_action("DELETE_RECORD", f"Deletou o último registro de '{person_to_delete}' (ID: {last_record_id}).")
                                 st.success(f"Último registro de {person_to_delete} deletado com sucesso."); st.rerun()
                             else: st.error("Falha ao deletar o registro.")
                         else:
@@ -209,8 +210,6 @@ def vehicle_access_interface():
     
     with st.expander("Visualizar todos os registros"):
         st.dataframe(df.fillna(""), use_container_width=True, hide_index=True)
-
-
 
 
 
