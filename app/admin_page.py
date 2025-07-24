@@ -15,7 +15,7 @@ from app.logger import log_action
 def display_pending_requests(sheet_ops):
     """Lida com a lógica da aba de Aprovações Pendentes."""
     st.header("Aprovação de Acessos Pendentes")
-    all_data = sheet_ops.carregar_dados() 
+    all_data = sheet_ops.carregar_dados()  # Carrega dados de 'acess'
     
     if not all_data or len(all_data) < 2:
         st.info("Não há dados de acesso para analisar ou a planilha está vazia.")
@@ -31,11 +31,13 @@ def display_pending_requests(sheet_ops):
     else:
         st.warning(f"Você tem {len(pending_requests)} solicitação(ões) de acesso para analisar.")
         
+        # Prioriza as solicitações da blocklist, mostrando-as primeiro
         pending_requests = pending_requests.sort_values(by='Status da Entrada', ascending=False)
 
         for _, row in pending_requests.iterrows():
             record_id = row['ID']
             person_name = row['Nome']
+            empresa_name = row.get('Empresa', '') # Pega o nome da empresa para a busca na blocklist
             request_date = row['Data']
             requester = row['Aprovador']
             reason = row.get('Motivo do Bloqueio', 'Motivo não especificado.')
@@ -58,15 +60,41 @@ def display_pending_requests(sheet_ops):
                 with action_col1:
                     if st.button("✅ Aprovar Entrada", key=f"approve_{record_id}", use_container_width=True, type="primary"):
                         admin_name = get_user_display_name()
-                        if update_record_status(record_id, "Autorizado", admin_name):
-                            log_action("APPROVE_ACCESS", f"Aprovou a entrada de '{person_name}' (Solicitante: {requester}). Status anterior: {current_status}")
+                        
+                        success_acess = update_record_status(record_id, "Autorizado", admin_name)
+                        
+                        if success_acess:
+                            log_action("APPROVE_ACCESS", f"Aprovou a entrada de '{person_name}' (Sol: {requester}). Status anterior: {current_status}")
+                            
+                            if current_status == 'Pendente de Liberação da Blocklist':
+                                st.info(f"Processando remoção de bloqueio permanente para '{person_name}'...")
+                                blocklist_df = get_blocklist()
+                                
+                                # Tenta encontrar o ID do bloqueio pelo nome da pessoa
+                                person_block = blocklist_df[(blocklist_df['Type'] == 'Pessoa') & (blocklist_df['Value'] == person_name)]
+                                
+                                block_id_to_remove = None
+                                if not person_block.empty:
+                                    block_id_to_remove = person_block.iloc[0]['ID']
+
+                                if block_id_to_remove:
+                                    if remove_from_blocklist([block_id_to_remove]):
+                                        st.success(f"Bloqueio permanente para '{person_name}' removido com sucesso!")
+                                        # Limpa o cache da blocklist para garantir que a UI seja atualizada
+                                        st.cache_data.clear()
+                                    else:
+                                        st.error(f"A entrada foi aprovada, mas FALHA ao remover o bloqueio permanente. Remova manualmente na aba 'Gerenciar Bloqueios'.")
+                                else:
+                                    st.warning(f"A entrada foi aprovada, mas não foi encontrado um bloqueio permanente correspondente para '{person_name}' para remover.")
+
                             if 'df_acesso_veiculos' in st.session_state:
                                 del st.session_state.df_acesso_veiculos
                             st.rerun()
+
                 with action_col2:
                     if st.button("❌ Negar Solicitação", key=f"deny_{record_id}", use_container_width=True):
                         if delete_record_by_id(record_id):
-                            log_action("DENY_ACCESS", f"Negou a entrada de '{person_name}' (Solicitante: {requester}). Status anterior: {current_status}")
+                            log_action("DENY_ACCESS", f"Negou a entrada de '{person_name}' (Sol: {requester}). Status anterior: {current_status}")
                             if 'df_acesso_veiculos' in st.session_state:
                                 del st.session_state.df_acesso_veiculos
                             st.rerun()
@@ -107,6 +135,12 @@ def display_blocklist_management(sheet_ops):
     st.divider()
 
     st.subheader("Remover Bloqueios (Liberar Acesso)")
+    
+    st.info(
+        "Use esta seção para **remover proativamente** um bloqueio permanente. Lembre-se: um bloqueio também é "
+        "removido automaticamente quando você aprova uma 'Solicitação Excepcional' na aba de pendências."
+    )
+    
     blocklist_df = get_blocklist()
 
     if blocklist_df.empty:
@@ -120,9 +154,11 @@ def display_blocklist_management(sheet_ops):
         
         if st.button("Liberar Selecionados", disabled=st.session_state.processing_blocklist):
             st.session_state.processing_blocklist = True 
+            
             if not selections_formatted:
                 st.warning("Nenhum bloqueio selecionado para liberação.")
-                st.session_state.processing_blocklist = False 
+                st.session_state.processing_blocklist = False
+            else:
                 ids_to_unblock = [options_to_unblock[item] for item in selections_formatted]
                 success = remove_from_blocklist(ids_to_unblock)
                 
@@ -130,8 +166,7 @@ def display_blocklist_management(sheet_ops):
                     st.success("Bloqueios removidos com sucesso! A lista será atualizada.")
                     st.cache_data.clear()
                 
-                st.session_state.processing_blocklist = False 
-                st.rerun() 
+                st.session_state.processing_blocklist
                 
 def display_logs(sheet_ops):
     """Lida com a lógica da aba de Logs."""
