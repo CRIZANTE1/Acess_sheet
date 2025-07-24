@@ -74,7 +74,10 @@ def display_pending_requests(sheet_ops):
 def display_blocklist_management(sheet_ops):
     """Lida com a lógica da aba de Gerenciamento de Bloqueios."""
     st.header("Gerenciamento de Bloqueios")
-
+    
+    if 'processing_blocklist' not in st.session_state:
+        st.session_state.processing_blocklist = False
+        
     with st.container(border=True):
         st.subheader("Adicionar Bloqueio de Pessoa ou Empresa")
         block_type = st.radio("Selecione o tipo de bloqueio:", ["Pessoa", "Empresa"], horizontal=True, key="block_type")
@@ -115,18 +118,21 @@ def display_blocklist_management(sheet_ops):
         options_to_unblock = {f"{row['Type']}: {row['Value']} (ID: {row['ID']})": row['ID'] for _, row in blocklist_df.iterrows()}
         selections_formatted = st.multiselect("Selecione um ou mais bloqueios para remover:", options=options_to_unblock.keys(), key="unblock_multiselect")
         
-        if st.button("Liberar Selecionados"):
+        if st.button("Liberar Selecionados", disabled=st.session_state.processing_blocklist):
+            st.session_state.processing_blocklist = True 
             if not selections_formatted:
                 st.warning("Nenhum bloqueio selecionado para liberação.")
-            else:
+                st.session_state.processing_blocklist = False 
                 ids_to_unblock = [options_to_unblock[item] for item in selections_formatted]
                 success = remove_from_blocklist(ids_to_unblock)
                 
                 if success:
-                    st.success("Bloqueios removidos com sucesso!")
+                    st.success("Bloqueios removidos com sucesso! A lista será atualizada.")
                     st.cache_data.clear()
-                    st.rerun()
-
+                
+                st.session_state.processing_blocklist = False 
+                st.rerun() 
+                
 def display_logs(sheet_ops):
     """Lida com a lógica da aba de Logs."""
     st.header("Logs de Atividade do Sistema")
