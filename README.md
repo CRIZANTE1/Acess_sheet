@@ -1,6 +1,16 @@
-# Sistema de Controle de Acesso e Briefing
+# Sistema de Controle de Acesso e Briefing v2.5
 
-Este sistema gerencia o controle de acesso de visitantes e veículos, utilizando o Google Sheets como banco de dados. Inclui verificação de briefing obrigatório para visitantes que não acessaram o local há mais de um ano e autenticação via Google OIDC.
+Este sistema robusto gerencia o controle de acesso de visitantes e veículos, utilizando o Google Sheets como um banco de dados flexível. A aplicação é construída com Streamlit e inclui autenticação segura via Google (OIDC), um sistema de papéis de usuário, fluxo de aprovação para acessos restritos, log de auditoria e um sistema de bloqueio permanente.
+
+## Funcionalidades Principais
+
+-   **Controle de Acesso em Tempo Real:** Registra entradas e saídas de pessoas e veículos.
+-   **Autenticação Segura:** Login via Google OIDC, garantindo que apenas usuários autenticados acessem o sistema.
+-   **Sistema de Papéis (Roles):** Permissões de usuário (`admin`, `operacional`) gerenciadas diretamente por uma planilha, permitindo controle de acesso granular sem alterar o código.
+-   **Fluxo de Aprovação:** Usuários operacionais podem solicitar a liberação de acessos temporariamente bloqueados, que devem ser aprovados por um administrador.
+-   **Gerenciamento de Bloqueios (Blocklist):** Administradores podem bloquear permanentemente pessoas ou empresas, impedindo qualquer tentativa de acesso futura.
+-   **Log de Auditoria:** Todas as ações críticas (logins, registros, aprovações, bloqueios, etc.) são registradas em uma planilha dedicada para fins de segurança e auditoria.
+-   **Verificação de Briefing de Segurança:** Alerta automático para a necessidade de repassar o briefing de segurança para visitantes com mais de um ano desde o último acesso registrado.
 
 ## Requisitos do Sistema
 
@@ -72,23 +82,23 @@ Este sistema gerencia o controle de acesso de visitantes e veículos, utilizando
 ```
 .
 ├── app/
-│   ├── admin_page.py       # Interface administrativa
-│   ├── data_operations.py    # Operações com dados (Google Sheets)
-│   ├── operations.py       # Classe SheetOperations para interação com Google Sheets
-│   ├── sheets_api.py       # Funções de conexão com Google Sheets
-│   ├── ui_interface.py       # Interface do usuário
+│   ├── admin_page.py       # Interface do painel administrativo
+│   ├── data_operations.py  # Funções de CRUD e lógica de negócio
+│   ├── logger.py           # Módulo para registro de logs de auditoria
+│   ├── operations.py       # Classe de baixo nível para interagir com o Google Sheets
+│   ├── sheets_api.py       # Conexão e autorização com a API do Google
+│   └── ui_interface.py     # Interface principal de controle de acesso
 │  
-├── auth/                   # Módulo de autenticação
-│   ├── __init__.py
-│   ├── auth_utils.py       # Funções auxiliares de autenticação
-│   └── login_page.py       # Página de login
-├── data/
-│   └── NOVO BRIEFING.mp4 # Vídeo de briefing
-├── .streamlit/             # Configurações do Streamlit
-│   └── secrets.toml        # Segredos e configurações OIDC
+├── auth/
+│   ├── auth_utils.py       # Funções de autenticação e verificação de papéis
+│   └── login_page.py       # Interface da página de login
+│  
+├── .streamlit/
+│   └── secrets.toml        # Arquivo de segredos (NÃO ENVIAR PARA O GIT)
+│
 ├── main.py                 # Ponto de entrada da aplicação
 ├── requirements.txt        # Dependências do projeto
-└── README.md               # Este arquivo
+└── README.md               # Este arquivo de documentação
 ```
 
 ## Suporte
