@@ -84,7 +84,6 @@ def vehicle_access_interface():
     """Renderiza a interface principal de controle de acesso."""
     st.title("Controle de Acesso BAERI")
     
-    # Inicializa os estados da sessão para um controle robusto
     if 'processing' not in st.session_state:
         st.session_state.processing = False
     if 'blocked_attempt' not in st.session_state:
@@ -106,27 +105,31 @@ def vehicle_access_interface():
         except Exception as e:
             st.error(f"Erro ao carregar o vídeo: {e}")
     
-    # Lógica de carregamento de dados
     if 'df_acesso_veiculos' not in st.session_state:
         data = sheet_operations.carregar_dados()
         df = pd.DataFrame(data[1:], columns=data[0]).fillna("") if data else pd.DataFrame()
     else:
         df = st.session_state.df_acesso_veiculos
-
     if not df.empty:
         df['Data_dt'] = pd.to_datetime(df['Data'], format='%d/%m/%Y', errors='coerce')
         df = df.sort_values(by=['Data_dt', 'Horário de Entrada'], ascending=[False, False]).drop(columns=['Data_dt'])
-    
     st.session_state.df_acesso_veiculos = df
-        
     aprovadores_autorizados = sheet_operations.carregar_dados_aprovadores()
     blocked_info = check_blocked_records(df)
-    if blocked_info: 
+    if blocked_info:
         st.error("Atenção! Pessoas com restrição de acesso:\n\n" + blocked_info)
 
     col_main, col_sidebar = st.columns([2, 1])
     with col_main:
         st.header("Painel de Registro")
+        
+        if st.session_state.blocked_attempt:
+            b_info = st.session_state.blocked_attempt
+            st.error(f"ACESSO NEGADO: '{b_info['name']}' (empresa: {b_info['company']}) está na blocklist. Motivo: {b_info['reason']}")
+            if st.button("⚠️ Solicitar Liberação Excepcional", key="override_dialog_button"):
+                st.session_state.blocked_attempt = None
+                request_blocklist_override_dialog(b_info['name'], b_info['company'])
+        
         unique_names = sorted(df["Nome"].unique()) if "Nome" in df.columns else []
         search_options = ["--- Novo Cadastro ---"] + unique_names
         selected_name = st.selectbox("Busque por um nome ou selecione 'Novo Cadastro':", options=search_options, index=0, key="person_selector")
