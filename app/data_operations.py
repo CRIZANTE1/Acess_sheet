@@ -209,6 +209,7 @@ def add_to_blocklist(block_type, values, reason, admin_name):
         st.error(f"Erro ao adicionar à blocklist: {e}")
         return False
 
+
 def remove_from_blocklist(block_ids):
     """Remove uma ou mais entradas da blocklist pelo ID."""
     try:
@@ -217,12 +218,18 @@ def remove_from_blocklist(block_ids):
         if blocklist_df.empty: return True
 
         for block_id in block_ids:
-            value_to_log = blocklist_df[blocklist_df['ID'] == block_id]['Value'].iloc[0]
-            if sheet_ops.excluir_dados_por_id_aba(block_id, 'blocklist'):
-                 log_action("REMOVE_FROM_BLOCKLIST", f"Liberado: '{value_to_log}' (ID do bloqueio: {block_id})")
+            value_to_log = "ID Desconhecido"
+            if not blocklist_df[blocklist_df['ID'] == str(block_id)].empty:
+                 value_to_log = blocklist_df[blocklist_df['ID'] == str(block_id)]['Value'].iloc[0]
+
+            if not sheet_ops.excluir_dados_por_id_aba(block_id, 'blocklist'):
+                st.error(f"Falha ao remover o bloqueio para '{value_to_log}' (ID: {block_id}). A operação foi interrompida.")
+                return False
             else:
-                st.warning(f"Não foi possível remover o bloqueio com ID {block_id}")
+                log_action("REMOVE_FROM_BLOCKLIST", f"Liberado: '{value_to_log}' (ID do bloqueio: {block_id})")
+        
         return True
+        
     except Exception as e:
         st.error(f"Erro ao remover da blocklist: {e}")
         return False
