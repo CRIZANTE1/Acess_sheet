@@ -22,20 +22,29 @@ def display_pending_requests(sheet_ops):
         return
 
     df = pd.DataFrame(all_data[1:], columns=all_data[0])
-    pending_requests = df[df['Status da Entrada'] == 'Pendente de Aprovação']
+    
+    pending_statuses = ['Pendente de Aprovação', 'Pendente de Liberação da Blocklist']
+    pending_requests = df[df['Status da Entrada'].isin(pending_statuses)]
     
     if pending_requests.empty:
         st.success("Tudo certo! Nenhuma solicitação de acesso pendente no momento.")
     else:
         st.warning(f"Você tem {len(pending_requests)} solicitação(ões) de acesso para analisar.")
+        
+        pending_requests = pending_requests.sort_values(by='Status da Entrada', ascending=False)
+
         for _, row in pending_requests.iterrows():
             record_id = row['ID']
             person_name = row['Nome']
             request_date = row['Data']
             requester = row['Aprovador']
             reason = row.get('Motivo do Bloqueio', 'Motivo não especificado.')
+            current_status = row['Status da Entrada']
 
             with st.container(border=True):
+                if current_status == 'Pendente de Liberação da Blocklist':
+                    st.error("⚠️ **SOLICITAÇÃO EXCEPCIONAL (BLOCKLIST)**")
+
                 st.subheader(f"Solicitação para: {person_name}")
                 col1, col2 = st.columns(2)
                 with col1:
@@ -50,14 +59,18 @@ def display_pending_requests(sheet_ops):
                     if st.button("✅ Aprovar Entrada", key=f"approve_{record_id}", use_container_width=True, type="primary"):
                         admin_name = get_user_display_name()
                         if update_record_status(record_id, "Autorizado", admin_name):
-                            log_action("APPROVE_ACCESS", f"Aprovou a entrada de '{person_name}' (Solicitante: {requester}).")
+                            log_action("APPROVE_ACCESS", f"Aprovou a entrada de '{person_name}' (Solicitante: {requester}). Status anterior: {current_status}")
+                            if 'df_acesso_veiculos' in st.session_state:
+                                del st.session_state.df_acesso_veiculos
                             st.rerun()
                 with action_col2:
                     if st.button("❌ Negar Solicitação", key=f"deny_{record_id}", use_container_width=True):
                         if delete_record_by_id(record_id):
-                            log_action("DENY_ACCESS", f"Negou a entrada de '{person_name}' (Solicitante: {requester}).")
+                            log_action("DENY_ACCESS", f"Negou a entrada de '{person_name}' (Solicitante: {requester}). Status anterior: {current_status}")
+                            if 'df_acesso_veiculos' in st.session_state:
+                                del st.session_state.df_acesso_veiculos
                             st.rerun()
-
+                            
 def display_blocklist_management(sheet_ops):
     """Lida com a lógica da aba de Gerenciamento de Bloqueios."""
     st.header("Gerenciamento de Bloqueios")
