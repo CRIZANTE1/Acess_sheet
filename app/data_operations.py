@@ -2,6 +2,9 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
 from app.operations import SheetOperations
+from app.logger import log_action
+from app.utils import get_sao_paulo_time
+
 
 def load_data_from_sheets():
     """Carrega os dados da planilha e armazena no estado da sessão."""
@@ -176,7 +179,72 @@ def check_blocked_records(df):
         return "Ocorreu um erro ao verificar os status de bloqueio."
 
 
+@st.cache_data(ttl=60) 
+def get_blocklist():
+    """Carrega e retorna a blocklist como um DataFrame."""
+    try:
+        sheet_ops = SheetOperations()
+        blocklist_data = sheet_ops.carregar_dados_aba('blocklist')
+        if blocklist_data and len(blocklist_data) > 1:
+            return pd.DataFrame(blocklist_data[1:], columns=blocklist_data[0])
+        return pd.DataFrame()
+    except Exception as e:
+        st.error(f"Erro ao carregar a lista de bloqueios: {e}")
+        return pd.DataFrame()
 
+def add_to_blocklist(block_type, values, reason, admin_name):
+    """Adiciona uma ou mais entidades à blocklist."""
+    try:
+        sheet_ops = SheetOperations()
+        timestamp = get_sao_paulo_time().strftime('%Y-%m-%d %H:%M:%S')
+        for value in values:
+            new_entry = [block_type, value, reason, admin_name, timestamp]
+            sheet_ops.adc_dados_aba(new_entry, 'blocklist') # Supondo que adc_dados_aba existe
+            log_action("ADD_TO_BLOCKLIST", f"Tipo: {block_type}, Valor: '{value}', Motivo: {reason}")
+        return True
+    except Exception as e:
+        st.error(f"Erro ao adicionar à blocklist: {e}")
+        return False
+
+def remove_from_blocklist(block_ids):
+    """Remove uma ou mais entradas da blocklist pelo ID."""
+    try:
+        sheet_ops = SheetOperations()
+        blocklist_df = get_blocklist()
+        if blocklist_df.empty: return True
+
+        for block_id in block_ids:
+            value_to_log = blocklist_df[blocklist_df['ID'] == block_id]['Value'].iloc[0]
+            if sheet_ops.excluir_dados_por_id_aba(block_id, 'blocklist'):
+                 log_action("REMOVE_FROM_BLOCKLIST", f"Liberado: '{value_to_log}' (ID do bloqueio: {block_id})")
+            else:
+                st.warning(f"Não foi possível remover o bloqueio com ID {block_id}")
+        return True
+    except Exception as e:
+        st.error(f"Erro ao remover da blocklist: {e}")
+        return False
+
+def is_entity_blocked(name, company):
+    """Verifica se um nome ou empresa está na blocklist."""
+    blocklist_df = get_blocklist()
+    if blocklist_df.empty:
+        return False, None
+
+    person_block = blocklist_df[
+        (blocklist_df['Type'] == 'Pessoa') & 
+        (blocklist_df['Value'].str.lower() == name.lower())
+    ]
+    if not person_block.empty:
+        return True, person_block.iloc[0]['Reason']
+
+    company_block = blocklist_df[
+        (blocklist_df['Type'] == 'Empresa') & 
+        (blocklist_df['Value'].str.lower() == company.lower())
+    ]
+    if not company_block.empty:
+        return True, company_block.iloc[0]['Reason']
+        
+    return False, None
 
 
 
