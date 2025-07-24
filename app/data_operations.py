@@ -51,7 +51,6 @@ def update_exit_time(name, exit_date_str, exit_time_str):
         entry_date = datetime.strptime(record_to_update["Data"], "%d/%m/%Y")
         exit_date = datetime.strptime(exit_date_str, "%d/%m/%Y")
 
-        # Caso 1: A saída ocorre no mesmo dia da entrada
         if entry_date.date() == exit_date.date():
             original_row = next((row for row in all_data if str(row[0]) == str(record_id)), None)
             if original_row is None: return False, "Registro original não encontrado para edição."
@@ -60,7 +59,7 @@ def update_exit_time(name, exit_date_str, exit_time_str):
             exit_time_index = header.index("Horário de Saída")
             
             updated_data = original_row[1:] # Pega os dados sem o ID
-            updated_data[exit_time_index - 1] = exit_time_str # -1 porque updated_data não tem ID
+            updated_data[exit_time_index - 1] = exit_time_str 
             
             if sheet_operations.editar_dados(record_id, updated_data):
                 return True, "Horário de saída atualizado com sucesso."
@@ -74,14 +73,12 @@ def update_exit_time(name, exit_date_str, exit_time_str):
             updated_data[exit_time_index - 1] = "23:59"
             sheet_operations.editar_dados(record_id, updated_data)
 
-            # Passo 2: Cria registros para os dias intermediários (se houver)
             current_date = entry_date + timedelta(days=1)
             while current_date.date() < exit_date.date():
                 intermediate_data = [name, record_to_update.get("CPF", ""), "", "", "00:00", "23:59", current_date.strftime("%d/%m/%Y"), record_to_update.get("Empresa", ""), "Autorizado", "", record_to_update.get("Aprovador", ""), ""]
                 sheet_operations.adc_dados(intermediate_data)
                 current_date += timedelta(days=1)
 
-            # Passo 3: Cria o registro final para o dia da saída
             final_data = [name, record_to_update.get("CPF", ""), "", "", "00:00", exit_time_str, exit_date_str, record_to_update.get("Empresa", ""), "Autorizado", "", record_to_update.get("Aprovador", ""), ""]
             sheet_operations.adc_dados(final_data)
             return True, "Registros de pernoite atualizados com sucesso."
@@ -90,23 +87,55 @@ def update_exit_time(name, exit_date_str, exit_time_str):
         return False, f"Erro ao atualizar horário de saída: {e}"
 
 def update_record_status(record_id, new_status, approver_name):
-    """Função administrativa para atualizar o status e o aprovador de um registro."""
+    """
+    Função administrativa para atualizar o status e o aprovador de um registro.
+    """
     try:
         sheet_operations = SheetOperations()
         all_data = sheet_operations.carregar_dados()
-        header = all_data[0]
         
+        if not all_data or len(all_data) < 2:
+            st.error("Não foi possível carregar dados para atualização.")
+            return False
+
+        header = all_data[0]
+        df = pd.DataFrame(all_data[1:], columns=header)
+        
+        record_to_update = df[df['ID'] == str(record_id)]
+        if record_to_update.empty:
+            st.error(f"Registro com ID {record_id} não encontrado para atualização.")
+            return False
+
+        original_row_list = next((row for row in all_data if str(row[0]) == str(record_id)), None)
+        if original_row_list is None:
+            return False # Segurança extra
+        
+        updated_data = original_row_list[1:]
+
         status_index = header.index("Status da Entrada")
         approver_index = header.index("Aprovador")
         
-        original_row = next((row for row in all_data if str(row[0]) == str(record_id)), None)
-        if original_row is None:
-            st.error(f"Registro com ID {record_id} não encontrado.")
-            return False
-
-        updated_data = original_row[1:]
+        # Atualiza o status e o aprovador
         updated_data[status_index - 1] = new_status
         updated_data[approver_index - 1] = approver_name
+
+        if new_status == "Autorizado":
+            cpf_index = header.index("CPF")
+            current_cpf = record_to_update.iloc[0].get('CPF', '')
+            
+            if not current_cpf or str(current_cpf).strip() == '':
+                person_name = record_to_update.iloc[0]['Nome']
+                
+                previous_records_with_cpf = df[
+                    (df['Nome'] == person_name) & 
+                    (df['CPF'].notna()) & 
+                    (df['CPF'] != '')
+                ]
+                
+                if not previous_records_with_cpf.empty:
+                    last_valid_cpf = previous_records_with_cpf.iloc[0]['CPF']
+                    updated_data[cpf_index - 1] = last_valid_cpf
+                    log_action("ENRICH_DATA", f"CPF '{last_valid_cpf}' adicionado ao registro {record_id} para '{person_name}' durante a aprovação.")
 
         if sheet_operations.editar_dados(record_id, updated_data):
             st.success("Status do registro atualizado com sucesso!")
