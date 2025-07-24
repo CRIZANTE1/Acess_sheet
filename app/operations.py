@@ -127,30 +127,32 @@ class SheetOperations:
             logging.error(f"Erro ao editar dados: {e}", exc_info=True)
             return False
 
-    def excluir_dados_por_id_aba(self, id, aba_name):
-        """
-        Função genérica e "silenciosa" para excluir uma linha de uma aba.
-        Retorna True em caso de sucesso, False em caso de falha. Não mostra UI.
-        """
+
+
+    def excluir_dados_por_id_aba(self, id_to_delete, aba_name):
+        """Exclui uma linha de uma aba específica com base no ID."""
         if not self.credentials or not self.my_archive_google_sheets:
             return False
         try:
             archive = self.credentials.open_by_url(self.my_archive_google_sheets)
             aba = archive.worksheet_by_title(aba_name)
-            data = aba.get_all_values()
             
-            for i, row in enumerate(data):
-                if row and row[0] == str(id):
-                    aba.delete_rows(i + 1)
-                    return True
-            return False
+            cell_list = aba.find(str(id_to_delete), matchCase=True, in_column=1)
+            
+            if cell_list:
+                row_to_delete = cell_list[0].row
+                aba.delete_rows(row_to_delete)
+                logging.info(f"Dados do ID {id_to_delete} excluídos com sucesso da aba '{aba_name}'.")
+                return True
+            else:
+                logging.error(f"ID {id_to_delete} não encontrado na aba '{aba_name}'.")
+                st.warning(f"Não foi possível encontrar o registro com ID {id_to_delete} para exclusão.")
+                return False
+                
         except Exception as e:
             logging.error(f"Erro ao excluir dados da aba '{aba_name}': {e}", exc_info=True)
+            st.error(f"Erro crítico ao tentar excluir dados: {e}")
             return False
-
-    def excluir_dados(self, id):
-        """Função de conveniência para excluir dados da aba 'acess'."""
-        return self.excluir_dados_por_id_aba(id, 'acess')
 
 
 
