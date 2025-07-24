@@ -137,11 +137,17 @@ class SheetOperations:
             archive = self.credentials.open_by_url(self.my_archive_google_sheets)
             aba = archive.worksheet_by_title(aba_name)
             
-            cell_list = aba.find(str(id_to_delete), matchCase=True, in_column=1)
+         
+            all_values = aba.get_all_values()
             
-            if cell_list:
-                row_to_delete = cell_list[0].row
-                aba.delete_rows(row_to_delete)
+            row_to_delete_index = -1
+            for i, row in enumerate(all_values[1:]):
+                if row and str(row[0]) == str(id_to_delete):
+                    row_to_delete_index = i + 2 
+                    break # Encontrou, pode parar de procurar
+
+            if row_to_delete_index != -1:
+                aba.delete_rows(row_to_delete_index)
                 logging.info(f"Dados do ID {id_to_delete} excluídos com sucesso da aba '{aba_name}'.")
                 return True
             else:
@@ -153,7 +159,6 @@ class SheetOperations:
             logging.error(f"Erro ao excluir dados da aba '{aba_name}': {e}", exc_info=True)
             st.error(f"Erro crítico ao tentar excluir dados: {e}")
             return False
-
 
 
 
