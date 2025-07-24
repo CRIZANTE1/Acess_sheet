@@ -166,7 +166,8 @@ def display_blocklist_management(sheet_ops):
                     st.success("Bloqueios removidos com sucesso! A lista será atualizada.")
                     st.cache_data.clear()
                 
-                st.session_state.processing_blocklist
+                st.session_state.processing_blocklist = False 
+                st.rerun()
                 
 def display_logs(sheet_ops):
     """Lida com a lógica da aba de Logs."""
