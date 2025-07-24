@@ -1,7 +1,13 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
-from app.data_operations import add_record, update_exit_time, delete_record_by_id, check_blocked_records
+from app.data_operations import (
+    add_record, 
+    update_exit_time, 
+    delete_record_by_id, 
+    check_blocked_records,
+    is_entity_blocked 
+)
 from app.operations import SheetOperations
 from app.utils import format_cpf, validate_cpf, get_sao_paulo_time
 from auth.auth_utils import get_user_display_name, is_admin
@@ -55,6 +61,7 @@ def show_people_inside(df, sheet_operations):
                     now = get_sao_paulo_time()
                     success, message = update_exit_time(row['Nome'], now.strftime("%d/%m/%Y"), now.strftime("%H:%M"))
                     if success:
+                        log_action("REGISTER_EXIT", f"Registrou saída para '{row['Nome']}'.")
                         st.success(f"Saída de {row['Nome']} registrada!"); st.rerun()
                     else:
                         st.error(message)
@@ -78,7 +85,6 @@ def vehicle_access_interface():
         except Exception as e:
             st.error(f"Erro ao carregar o vídeo: {e}")
     
-    # Lógica de carregamento e ordenação
     if 'df_acesso_veiculos' not in st.session_state or st.session_state.df_acesso_veiculos.empty:
         data = sheet_operations.carregar_dados()
         df = pd.DataFrame(data[1:], columns=data[0]).fillna("") if data else pd.DataFrame()
@@ -143,10 +149,15 @@ def vehicle_access_interface():
                 empresa = st.text_input("Empresa", value=str(latest_record.get("Empresa", "")))
                 aprovador = st.selectbox("Aprovador:", options=aprovadores_autorizados)
                 if st.form_submit_button(f"▶️ Registrar Entrada de {selected_name}", use_container_width=True, type="primary"):
-                    now = get_sao_paulo_time()
-                    if add_record(name=selected_name, cpf=str(latest_record.get("CPF", "")), placa=placa, marca_carro=str(latest_record.get("Marca do Carro", "")), horario_entrada=now.strftime("%H:%M"), data=now.strftime("%d/%m/%Y"), empresa=empresa, status="Autorizado", motivo="", aprovador=aprovador, first_reg_date=""):
-                        log_action("REGISTER_ENTRY", f"Registrou nova entrada para '{selected_name}'. Placa: {placa}.")
-                        st.success(f"Nova entrada de {selected_name} registrada!"); st.rerun()
+                    is_blocked, reason = is_entity_blocked(selected_name, empresa)
+                    if is_blocked:
+                        st.error(f"ACESSO NEGADO: Acesso permanentemente bloqueado. Motivo: {reason}")
+                        log_action("BLOCKED_ACCESS_ATTEMPT", f"Tentativa de acesso de '{selected_name}' da empresa '{empresa}' foi negada pela blocklist.")
+                    else:
+                        now = get_sao_paulo_time()
+                        if add_record(name=selected_name, cpf=str(latest_record.get("CPF", "")), placa=placa, marca_carro=str(latest_record.get("Marca do Carro", "")), horario_entrada=now.strftime("%H:%M"), data=now.strftime("%d/%m/%Y"), empresa=empresa, status="Autorizado", motivo="", aprovador=aprovador, first_reg_date=""):
+                            log_action("REGISTER_ENTRY", f"Registrou nova entrada para '{selected_name}'. Placa: {placa}.")
+                            st.success(f"Nova entrada de {selected_name} registrada!"); st.rerun()
 
         elif status == "Novo":
             st.info("Pessoa não encontrada. Preencha o formulário.")
@@ -164,10 +175,16 @@ def vehicle_access_interface():
                     elif not validate_cpf(cpf):
                         st.error("CPF inválido. Verifique os dígitos.")
                     else:
-                        now = get_sao_paulo_time()
-                        if add_record(name=name.strip(), cpf=format_cpf(cpf), placa=placa, marca_carro=marca_carro, horario_entrada=now.strftime("%H:%M"), data=now.strftime("%d/%m/%Y"), empresa=empresa, status="Autorizado", motivo="", aprovador=aprovador, first_reg_date=now.strftime("%d/%m/%Y")):
-                            log_action("CREATE_RECORD", f"Cadastrou novo visitante: '{name.strip()}'.")
-                            st.success(f"Novo registro para {name} criado com sucesso!"); st.rerun()
+                        # <<< ALTERAÇÃO AQUI: VERIFICAÇÃO DA BLOCKLIST >>>
+                        is_blocked, reason = is_entity_blocked(name.strip(), empresa.strip())
+                        if is_blocked:
+                            st.error(f"ACESSO NEGADO: Acesso permanentemente bloqueado. Motivo: {reason}")
+                            log_action("BLOCKED_ACCESS_ATTEMPT", f"Tentativa de acesso de '{name.strip()}' da empresa '{empresa.strip()}' foi negada pela blocklist.")
+                        else:
+                            now = get_sao_paulo_time()
+                            if add_record(name=name.strip(), cpf=format_cpf(cpf), placa=placa, marca_carro=marca_carro, horario_entrada=now.strftime("%H:%M"), data=now.strftime("%d/%m/%Y"), empresa=empresa.strip(), status="Autorizado", motivo="", aprovador=aprovador, first_reg_date=now.strftime("%d/%m/%Y")):
+                                log_action("CREATE_RECORD", f"Cadastrou novo visitante: '{name.strip()}'.")
+                                st.success(f"Novo registro para {name} criado com sucesso!"); st.rerun()
 
     with col_sidebar:
         if not df.empty: 
@@ -210,7 +227,6 @@ def vehicle_access_interface():
     
     with st.expander("Visualizar todos os registros"):
         st.dataframe(df.fillna(""), use_container_width=True, hide_index=True)
-
 
 
 
