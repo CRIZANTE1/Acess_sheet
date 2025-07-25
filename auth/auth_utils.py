@@ -1,6 +1,6 @@
 import streamlit as st
 from app.operations import SheetOperations
-
+from app.utils import get_sao_paulo_time
 
 @st.cache_data(ttl=300)
 def _load_user_roles():
@@ -80,3 +80,31 @@ def is_admin():
 def is_operacional():
     """Verifica se o usuário atual tem o papel de 'operacional'."""
     return get_user_role() == 'operacional'
+
+def is_session_expired():
+    """
+    Verifica se a sessão do usuário expirou com base nos horários de corte (07:00 e 19:00).
+    """
+    if 'login_time' not in st.session_state:
+        return False
+
+    login_time = st.session_state.login_time
+    current_time = get_sao_paulo_time()
+
+    cutoff_morning_login_day = login_time.replace(hour=7, minute=0, second=0, microsecond=0)
+    cutoff_evening_login_day = login_time.replace(hour=19, minute=0, second=0, microsecond=0)
+    
+    if login_time < cutoff_morning_login_day and current_time >= cutoff_morning_login_day:
+        return True
+
+    if (login_time >= cutoff_morning_login_day and login_time < cutoff_evening_login_day) and \
+       (current_time >= cutoff_evening_login_day):
+        return True
+
+    if login_time >= cutoff_evening_login_day:
+        if current_time.date() > login_time.date():
+            cutoff_morning_current_day = current_time.replace(hour=7, minute=0, second=0, microsecond=0)
+            if current_time >= cutoff_morning_current_day:
+                return True
+
+    return False
