@@ -81,9 +81,27 @@ def is_operacional():
     """Verifica se o usuário atual tem o papel de 'operacional'."""
     return get_user_role() == 'operacional'
 
+def _get_shift(dt_object):
+    """
+    Determina o turno com base em um objeto datetime.
+    - Turno 1 (Diurno): 07:00:00 - 18:59:59
+    - Turno 2 (Noturno): 19:00:00 - 06:59:59
+    Retorna 1 ou 2.
+    """
+    seven_am = time(7, 0, 0)
+    seven_pm = time(19, 0, 0)
+    
+    current_time_obj = dt_object.time()
+    
+    if seven_am <= current_time_obj < seven_pm:
+        return 1  
+    else:
+        return 2  
+
 def is_session_expired():
     """
-    Verifica se a sessão do usuário expirou com base nos horários de corte (07:00 e 19:00).
+    Verifica se a sessão do usuário expirou porque o turno mudou
+    desde o momento do login.
     """
     if 'login_time' not in st.session_state:
         return False
@@ -91,20 +109,10 @@ def is_session_expired():
     login_time = st.session_state.login_time
     current_time = get_sao_paulo_time()
 
-    cutoff_morning_login_day = login_time.replace(hour=7, minute=0, second=0, microsecond=0)
-    cutoff_evening_login_day = login_time.replace(hour=19, minute=0, second=0, microsecond=0)
-    
-    if login_time < cutoff_morning_login_day and current_time >= cutoff_morning_login_day:
+    login_shift = _get_shift(login_time)
+    current_shift = _get_shift(current_time)
+
+    if login_shift != current_shift:
         return True
-
-    if (login_time >= cutoff_morning_login_day and login_time < cutoff_evening_login_day) and \
-       (current_time >= cutoff_evening_login_day):
-        return True
-
-    if login_time >= cutoff_evening_login_day:
-        if current_time.date() > login_time.date():
-            cutoff_morning_current_day = current_time.replace(hour=7, minute=0, second=0, microsecond=0)
-            if current_time >= cutoff_morning_current_day:
-                return True
-
+        
     return False
