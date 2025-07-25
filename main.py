@@ -59,6 +59,8 @@ def main():
         
         if page == "Controle de Acesso":
             vehicle_access_interface()
+        elif page == "Agendar Visita":
+            scheduling_page()    
         elif page == "Painel Administrativo" and user_role == 'admin':
             admin_page()
         elif page == "Resumo": 
