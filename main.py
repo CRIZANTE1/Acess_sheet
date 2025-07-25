@@ -8,6 +8,7 @@ from app.logger import log_action
 from app.ui_interface import vehicle_access_interface
 from app.admin_page import admin_page
 from app.summary_page import summary_page 
+from app.scheduling_page import scheduling_page
 
 st.set_page_config(page_title="Controle de Acesso BAERI", layout="wide")
 
