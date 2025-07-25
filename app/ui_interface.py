@@ -13,7 +13,6 @@ from app.utils import format_cpf, validate_cpf, get_sao_paulo_time
 from auth.auth_utils import get_user_display_name, is_admin
 from app.logger import log_action
 
-# <<< FUNÇÕES QUE FALTAVAM ESTÃO AQUI >>>
 
 @st.dialog("Solicitar Liberação Excepcional")
 def request_blocklist_override_dialog(name, company):
@@ -81,7 +80,6 @@ def show_people_inside(df, sheet_operations):
                 st.session_state.processing = False
                 st.rerun()
 
-# --- FUNÇÃO PRINCIPAL ---
 
 def vehicle_access_interface():
     """Renderiza a interface principal de controle de acesso."""
