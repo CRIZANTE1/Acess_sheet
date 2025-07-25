@@ -45,7 +45,10 @@ def request_blocklist_override_dialog(name, company):
 
 
 def show_scheduled_today(sheet_ops):
-    """Mostra uma lista de visitantes agendados para hoje e permite o check-in."""
+    """
+    Mostra uma lista de visitantes agendados APENAS PARA HOJE e que ainda
+    não tiveram check-in. Agendamentos passados não aparecem.
+    """
     st.header("Visitantes Agendados para Hoje")
     
     schedules_data = sheet_ops.carregar_dados_aba('schedules')
@@ -55,6 +58,10 @@ def show_scheduled_today(sheet_ops):
 
     df_schedules = pd.DataFrame(schedules_data[1:], columns=schedules_data[0])
     
+    if 'ScheduledDate' not in df_schedules.columns or 'Status' not in df_schedules.columns:
+        st.warning("A planilha 'schedules' não contém as colunas 'ScheduledDate' ou 'Status'.")
+        return
+
     today_str = get_sao_paulo_time().strftime("%d/%m/%Y")
     
     today_schedules = df_schedules[
@@ -63,9 +70,10 @@ def show_scheduled_today(sheet_ops):
     ].sort_values(by='ScheduledTime')
 
     if today_schedules.empty:
-        st.info("Nenhum visitante agendado para hoje.")
+        st.info("Nenhum visitante pendente de chegada para hoje.")
         return
 
+    st.write("Aguardando chegada:")
     for _, schedule in today_schedules.iterrows():
         schedule_id = schedule['ID']
         visitor_name = schedule['VisitorName']
@@ -82,12 +90,11 @@ def show_scheduled_today(sheet_ops):
                 st.caption(f"Autorizado por: {schedule['AuthorizedBy']}")
             with col3:
                 if st.button("Registrar Chegada", key=f"checkin_{schedule_id}", use_container_width=True, type="primary"):
-                    # Lógica de check-in
                     now = get_sao_paulo_time()
                     if add_record(
                         name=visitor_name,
                         cpf=schedule['VisitorCPF'],
-                        placa="", # Pode ser adicionado um campo para isso
+                        placa="",
                         marca_carro="",
                         horario_entrada=now.strftime("%H:%M"),
                         data=now.strftime("%d/%m/%Y"),
@@ -95,7 +102,7 @@ def show_scheduled_today(sheet_ops):
                         status="Autorizado",
                         motivo="Visita Agendada",
                         aprovador=schedule['AuthorizedBy'],
-                        first_reg_date="" # Pode ser enriquecido depois
+                        first_reg_date="" 
                     ):
                         if update_schedule_status(schedule_id, "Realizado", now.strftime("%H:%M")):
                             st.success(f"Chegada de {visitor_name} registrada com sucesso!")
