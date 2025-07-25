@@ -69,7 +69,13 @@ def scheduling_page():
     df_schedules = pd.DataFrame(schedules_data[1:], columns=schedules_data[0])
     
     df_schedules['ScheduledDate_dt'] = pd.to_datetime(df_schedules['ScheduledDate'], format='%d/%m/%Y', errors='coerce')
-    
+  
+    df_schedules.dropna(subset=['ScheduledDate_dt'], inplace=True)
+
+    if df_schedules.empty:
+        st.info("Nenhum agendamento com data válida encontrado.")
+        return
+
     today_date = get_sao_paulo_time().date()
 
     no_shows = df_schedules[
@@ -77,15 +83,12 @@ def scheduling_page():
         (df_schedules['Status'] == 'Agendado')
     ]
 
-
     pending_schedules = df_schedules[
         (df_schedules['ScheduledDate_dt'].dt.date >= today_date) &
         (df_schedules['Status'] == 'Agendado')
     ].sort_values(by='ScheduledDate_dt')
 
     completed_schedules = df_schedules[df_schedules['Status'] == 'Realizado'].sort_values(by='ScheduledDate_dt', ascending=False)
-
-    tab1, tab2, tab3 = st.tabs([f"Pendentes ({len(pending_schedules)})", f"Realizados ({len(completed_schedules)})", f"Não Compareceram ({len(no_shows)})"])
 
     with tab1:
         st.subheader("Visitas Agendadas Pendentes")
