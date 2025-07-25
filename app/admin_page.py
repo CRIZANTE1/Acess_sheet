@@ -263,7 +263,7 @@ def admin_page():
         st.subheader("Informações de Login OIDC")
         st.json({
             "status": "Ativo",
-            "provedor": "Configurado no secrets.toml"
+            "provedor": "Configurado no secrets"
         })
         st.subheader("Status do Sistema")
         st.json({
