@@ -269,7 +269,7 @@ def vehicle_access_interface():
                         st.session_state.processing = False
                         st.rerun()
     
-        with st.expander("Visualizar todos os registros"):
+    with st.expander("Visualizar todos os registros"):
             if not df.empty:
                
                 colunas_para_exibir = [
