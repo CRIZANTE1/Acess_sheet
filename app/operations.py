@@ -205,19 +205,63 @@ class SheetOperations:
             archive = self.credentials.open_by_url(self.my_archive_google_sheets)
             aba = archive.worksheet_by_title(aba_name)
             
-            cell = aba.find(str(row_id), matchCase=True, in_column=1)
-            if cell:
+            all_values = aba.get_all_values()
+            row_to_update_index = -1
+            
+            # Itera sobre as linhas para encontrar o ID
+            for i, row in enumerate(all_values):
+                # Compara o valor da primeira coluna (ID)
+                if row and str(row[0]) == str(row_id):
+                    row_to_update_index = i + 1
+                    break
+            
+            if row_to_update_index != -1:
                 updated_row = [str(row_id)] + updated_data
-                aba.update_row(cell[0].row, updated_row)
+                aba.update_row(row_to_update_index, updated_row)
+                logging.info(f"Dados do ID {row_id} editados com sucesso na aba '{aba_name}'.")
                 return True
-            return False
+            else:
+                logging.error(f"ID {row_id} não encontrado na aba '{aba_name}' para edição.")
+                return False
+                
         except Exception as e:
             logging.error(f"Erro ao editar dados na aba '{aba_name}': {e}", exc_info=True)
+            st.error(f"Erro crítico ao tentar editar dados: {e}")
             return False
 
     def editar_dados(self, id, updated_data):
         """Função de conveniência para editar dados na aba 'acess'."""
         return self.editar_dados_aba(id, updated_data, 'acess')
+
+    def excluir_dados_por_id_aba(self, id_to_delete, aba_name):
+        """Exclui uma linha de uma aba específica com base no ID."""
+        if not self.credentials or not self.my_archive_google_sheets:
+            return False
+        try:
+            archive = self.credentials.open_by_url(self.my_archive_google_sheets)
+            aba = archive.worksheet_by_title(aba_name)
+            
+            all_values = aba.get_all_values()
+            row_to_delete_index = -1
+            
+            for i, row in enumerate(all_values):
+                if row and str(row[0]) == str(id_to_delete):
+                    row_to_delete_index = i + 1
+                    break
+
+            if row_to_delete_index != -1:
+                aba.delete_rows(row_to_delete_index)
+                logging.info(f"Dados do ID {id_to_delete} excluídos com sucesso da aba '{aba_name}'.")
+                return True
+            else:
+                logging.error(f"ID {id_to_delete} não encontrado na aba '{aba_name}'.")
+                st.warning(f"Não foi possível encontrar o registro com ID {id_to_delete} para exclusão.")
+                return False
+                
+        except Exception as e:
+            logging.error(f"Erro ao excluir dados da aba '{aba_name}': {e}", exc_info=True)
+            st.error(f"Erro crítico ao tentar excluir dados: {e}")
+            return False
 
 
 
