@@ -325,6 +325,31 @@ def remove_user(user_name):
         st.error(f"Erro ao remover usuário: {e}")
         return False
 
+def update_schedule_status(schedule_id, new_status, checkin_time):
+    """Atualiza o status e a hora de check-in de um agendamento."""
+    try:
+        sheet_ops = SheetOperations()
+        
+        all_schedules = sheet_ops.carregar_dados_aba('schedules')
+        if not all_schedules: return False
+        
+        header = all_schedules[0]
+        original_row_list = next((row for row in all_schedules if str(row[0]) == str(schedule_id)), None)
+        if not original_row_list: return False
+        
+        updated_data = original_row_list[1:] # Dados sem ID
+        
+        status_idx = header.index('Status')
+        checkin_idx = header.index('CheckInTime')
+        
+        updated_data[status_idx - 1] = new_status
+        updated_data[checkin_idx - 1] = checkin_time
+        
+        return sheet_ops.editar_dados_aba(schedule_id, updated_data, 'schedules')
+    except Exception as e:
+        st.error(f"Erro ao atualizar status do agendamento: {e}")
+        return False
+
 
 
 
