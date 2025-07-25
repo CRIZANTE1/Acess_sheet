@@ -162,6 +162,41 @@ class SheetOperations:
             st.error(f"Erro crítico ao tentar excluir dados: {e}")
             return False
 
+    def excluir_linha_por_valor(self, valor_busca, nome_coluna, nome_aba):
+        """Exclui a primeira linha encontrada que corresponde a um valor em uma coluna específica."""
+        if not self.credentials or not self.my_archive_google_sheets:
+            return False
+        try:
+            archive = self.credentials.open_by_url(self.my_archive_google_sheets)
+            aba = archive.worksheet_by_title(nome_aba)
+            
+            all_data = aba.get_all_values()
+            if not all_data: return False
+
+            header = all_data[0]
+            try:
+                col_index = header.index(nome_coluna)
+            except ValueError:
+                logging.error(f"Coluna '{nome_coluna}' não encontrada na aba '{nome_aba}'.")
+                return False
+
+            row_to_delete_index = -1
+            for i, row in enumerate(all_data[1:]):
+                if row and len(row) > col_index and str(row[col_index]) == str(valor_busca):
+                    row_to_delete_index = i + 2 
+                    break
+            
+            if row_to_delete_index != -1:
+                aba.delete_rows(row_to_delete_index)
+                logging.info(f"Linha com valor '{valor_busca}' na coluna '{nome_coluna}' excluída de '{nome_aba}'.")
+                return True
+            else:
+                logging.warning(f"Nenhum valor '{valor_busca}' encontrado para exclusão em '{nome_aba}'.")
+                return False
+        except Exception as e:
+            logging.error(f"Erro ao excluir linha por valor: {e}", exc_info=True)
+            return False
+
 
 
 
