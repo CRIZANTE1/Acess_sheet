@@ -285,6 +285,47 @@ def is_entity_blocked(name, company):
         
     return False, None
 
+# No final de app/data_operations.py
+
+@st.cache_data(ttl=60)
+def get_users():
+    """Carrega e retorna a lista de usuários como um DataFrame."""
+    try:
+        sheet_ops = SheetOperations()
+        users_data = sheet_ops.carregar_dados_aba('users')
+        if users_data and len(users_data) > 1:
+            return pd.DataFrame(users_data[1:], columns=users_data[0])
+        return pd.DataFrame()
+    except Exception as e:
+        st.error(f"Erro ao carregar a lista de usuários: {e}")
+        return pd.DataFrame()
+
+def add_user(user_name, role):
+    """Adiciona um novo usuário à planilha 'users'."""
+    try:
+        sheet_ops = SheetOperations()
+     
+        new_user_data = [user_name, role]
+        if sheet_ops.adc_dados_aba(new_user_data, 'users'):
+            log_action("ADD_USER", f"Adicionou usuário '{user_name}' com o papel '{role}'.")
+            return True
+        return False
+    except Exception as e:
+        st.error(f"Erro ao adicionar usuário: {e}")
+        return False
+
+def remove_user(user_name):
+    """Remove um usuário da planilha 'users' pelo nome."""
+    try:
+        sheet_ops = SheetOperations()
+        if sheet_ops.excluir_linha_por_valor(user_name, 'user_name', 'users'):
+            log_action("REMOVE_USER", f"Removeu o usuário '{user_name}'.")
+            return True
+        return False
+    except Exception as e:
+        st.error(f"Erro ao remover usuário: {e}")
+        return False
+
 
 
 
