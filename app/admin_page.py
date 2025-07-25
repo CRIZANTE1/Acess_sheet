@@ -268,8 +268,8 @@ def admin_page():
         st.subheader("Status do Sistema")
         st.json({
             "sistema": "Controle de Acesso de Pessoas e Veículos",
-            "versão": "2.4.0", 
-            "modo_login": "OIDC (OpenID Connect) com Papéis via Google Sheets",
+            "versão": "2.7.0", 
+            "modo_login": "OIDC (OpenID Connect) com níveis via Google Sheets",
             "status": "Operacional",
             "Developer": "Cristian Ferreira Carlos",
             "Data": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
