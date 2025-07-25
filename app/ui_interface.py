@@ -12,6 +12,7 @@ from app.operations import SheetOperations
 from app.utils import format_cpf, validate_cpf, get_sao_paulo_time
 from auth.auth_utils import get_user_display_name, is_admin
 from app.logger import log_action
+from app.data_operations import update_schedule_status
 
 
 @st.dialog("Solicitar Liberação Excepcional")
