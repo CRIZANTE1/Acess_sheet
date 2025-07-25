@@ -8,9 +8,65 @@ from app.data_operations import (
     delete_record_by_id,
     get_blocklist,
     add_to_blocklist,
-    remove_from_blocklist
+    remove_from_blocklist,
+    get_users, 
+    add_user,    
+    remove_user 
 )
 from app.logger import log_action
+
+def display_user_management(sheet_ops):
+    """Lida com a lógica da aba de Gerenciamento de Usuários."""
+    st.header("Gerenciamento de Usuários do Sistema")
+
+    with st.container(border=True):
+        st.subheader("Adicionar Novo Usuário")
+        new_user_name = st.text_input("Nome Completo do Usuário (deve corresponder ao nome da conta Google):")
+        # Por segurança, o admin só pode adicionar usuários operacionais pela UI.
+        new_user_role = "operacional"
+        st.info(f"O usuário será adicionado com o papel de **{new_user_role}**.")
+
+        if st.button("Adicionar Usuário", type="primary"):
+            if not new_user_name.strip():
+                st.error("O nome do usuário não pode estar vazio.")
+            else:
+                if add_user(new_user_name.strip(), new_user_role):
+                    st.success(f"Usuário '{new_user_name.strip()}' adicionado com sucesso!")
+                    st.cache_data.clear() # Limpa o cache para recarregar a lista de usuários
+                    st.rerun()
+
+    st.divider()
+
+    st.subheader("Remover Usuário Operacional")
+    users_df = get_users()
+
+    if users_df.empty:
+        st.info("Nenhum usuário encontrado para gerenciar.")
+    else:
+        operational_users = users_df[users_df['role'] == 'operacional']
+        
+        if operational_users.empty:
+            st.info("Não há usuários operacionais para remover.")
+        else:
+            users_to_remove = st.multiselect(
+                "Selecione um ou mais usuários operacionais para remover:",
+                options=operational_users['user_name'].tolist()
+            )
+            
+            if st.button("Remover Usuários Selecionados", type="secondary"):
+                if not users_to_remove:
+                    st.warning("Nenhum usuário selecionado para remoção.")
+                else:
+                    success_count = 0
+                    for user in users_to_remove:
+                        if remove_user(user):
+                            success_count += 1
+                    
+                    st.success(f"{success_count} de {len(users_to_remove)} usuário(s) removido(s) com sucesso!")
+                    if success_count > 0:
+                        st.cache_data.clear()
+                        st.rerun()
+
 
 def display_pending_requests(sheet_ops):
     """Lida com a lógica da aba de Aprovações Pendentes."""
@@ -191,13 +247,15 @@ def admin_page():
     st.title("Painel Administrativo")
     sheet_ops = SheetOperations()
     
-    tab1, tab2, tab3 = st.tabs(["Aprovações Pendentes", "Gerenciar Bloqueios", "Logs do Sistema"])
+    tab1, tab2, tab3 = st.tabs(["Aprovações Pendentes", "Gerenciar Bloqueios", "Gerenciar Usuários", "Logs do Sistema"])
 
     with tab1:
         display_pending_requests(sheet_ops)
     with tab2:
         display_blocklist_management(sheet_ops)
     with tab3:
+        display_user_management(sheet_ops) 
+    with tab4:
         display_logs(sheet_ops)
         
     st.divider()
