@@ -48,7 +48,7 @@ def scheduling_page():
                 time_str,
                 authorizer,
                 status,
-                ""
+                ""  # CheckInTime inicialmente vazio
             ]
             
             if sheet_ops.adc_dados_aba(new_schedule_data, 'schedules'):
@@ -78,6 +78,7 @@ def scheduling_page():
 
     today_date = get_sao_paulo_time().date()
 
+    # Filtra os DataFrames para cada categoria
     no_shows = df_schedules[
         (df_schedules['ScheduledDate_dt'].dt.date < today_date) &
         (df_schedules['Status'] == 'Agendado')
@@ -89,6 +90,12 @@ def scheduling_page():
     ].sort_values(by='ScheduledDate_dt')
 
     completed_schedules = df_schedules[df_schedules['Status'] == 'Realizado'].sort_values(by='ScheduledDate_dt', ascending=False)
+
+    tab1, tab2, tab3 = st.tabs([
+        f"Pendentes ({len(pending_schedules)})", 
+        f"Realizados ({len(completed_schedules)})", 
+        f"Não Compareceram ({len(no_shows)})"
+    ])
 
     with tab1:
         st.subheader("Visitas Agendadas Pendentes")
