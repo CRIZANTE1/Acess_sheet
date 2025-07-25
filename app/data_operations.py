@@ -285,7 +285,6 @@ def is_entity_blocked(name, company):
         
     return False, None
 
-# No final de app/data_operations.py
 
 @st.cache_data(ttl=60)
 def get_users():
