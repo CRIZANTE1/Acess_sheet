@@ -42,6 +42,67 @@ def request_blocklist_override_dialog(name, company):
         else:
             st.error("O motivo é obrigatório para enviar a solicitação.")
 
+
+def show_scheduled_today(sheet_ops):
+    """Mostra uma lista de visitantes agendados para hoje e permite o check-in."""
+    st.header("Visitantes Agendados para Hoje")
+    
+    schedules_data = sheet_ops.carregar_dados_aba('schedules')
+    if not schedules_data or len(schedules_data) < 2:
+        st.info("Nenhum visitante agendado para hoje.")
+        return
+
+    df_schedules = pd.DataFrame(schedules_data[1:], columns=schedules_data[0])
+    
+    today_str = get_sao_paulo_time().strftime("%d/%m/%Y")
+    
+    today_schedules = df_schedules[
+        (df_schedules['ScheduledDate'] == today_str) &
+        (df_schedules['Status'] == 'Agendado')
+    ].sort_values(by='ScheduledTime')
+
+    if today_schedules.empty:
+        st.info("Nenhum visitante agendado para hoje.")
+        return
+
+    for _, schedule in today_schedules.iterrows():
+        schedule_id = schedule['ID']
+        visitor_name = schedule['VisitorName']
+        company = schedule['Company']
+        time = schedule['ScheduledTime']
+        
+        with st.container(border=True):
+            col1, col2, col3 = st.columns([2, 2, 2])
+            with col1:
+                st.write(f"**{visitor_name}**")
+                st.caption(f"Empresa: {company}")
+            with col2:
+                st.write(f"Horário: **{time}**")
+                st.caption(f"Autorizado por: {schedule['AuthorizedBy']}")
+            with col3:
+                if st.button("Registrar Chegada", key=f"checkin_{schedule_id}", use_container_width=True, type="primary"):
+                    # Lógica de check-in
+                    now = get_sao_paulo_time()
+                    if add_record(
+                        name=visitor_name,
+                        cpf=schedule['VisitorCPF'],
+                        placa="", # Pode ser adicionado um campo para isso
+                        marca_carro="",
+                        horario_entrada=now.strftime("%H:%M"),
+                        data=now.strftime("%d/%m/%Y"),
+                        empresa=company,
+                        status="Autorizado",
+                        motivo="Visita Agendada",
+                        aprovador=schedule['AuthorizedBy'],
+                        first_reg_date="" # Pode ser enriquecido depois
+                    ):
+                        if update_schedule_status(schedule_id, "Realizado", now.strftime("%H:%M")):
+                            st.success(f"Chegada de {visitor_name} registrada com sucesso!")
+                            log_action("CHECK_IN", f"Check-in realizado para a visita agendada de '{visitor_name}'.")
+                            if 'df_acesso_veiculos' in st.session_state:
+                                del st.session_state.df_acesso_veiculos
+                            st.rerun()
+                            
 def get_person_status(name, df):
     """Verifica o status mais recente, incluindo o novo status de liberação."""
     if not name or name == "--- Novo Cadastro ---": return "Novo", None
@@ -294,6 +355,6 @@ def vehicle_access_interface():
             else:
                 st.info("Nenhum registro para exibir.")
 
-
+    show_scheduled_today(sheet_operations)
 
 
