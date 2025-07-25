@@ -1,10 +1,8 @@
-
 import streamlit as st
 
+from auth.login_page import show_login_page, show_user_header, show_logout_button
 from auth.auth_utils import is_user_logged_in, get_user_role, is_session_expired
 from app.utils import get_sao_paulo_time
-
-from auth.login_page import show_login_page, show_user_header, show_logout_button
 from app.data_operations import load_data_from_sheets
 from app.logger import log_action
 from app.ui_interface import vehicle_access_interface
@@ -14,6 +12,7 @@ from app.summary_page import summary_page
 st.set_page_config(page_title="Controle de Acesso BAERI", layout="wide")
 
 def main():
+    # Carrega os dados se ainda não estiverem na sessão
     if 'df_acesso_veiculos' not in st.session_state:
         load_data_from_sheets()
 
@@ -24,20 +23,22 @@ def main():
             st.session_state.login_time = get_sao_paulo_time()
 
         if is_session_expired():
-            st.warning("Sua sessão expirou devido ao horário de troca de turno (07:00 / 19:00). Por favor, faça login novamente.")
+            st.warning("Sua sessão expirou devido à troca de turno. Por favor, faça login novamente.")
             log_action("SESSION_EXPIRED", "Sessão do usuário expirou automaticamente.")
-            # Limpa chaves da sessão e força o logout
-            if 'login_time' in st.session_state: del st.session_state.login_time
-            if 'login_logged' in st.session_state: del st.session_state.login_logged
+            
+            keys_to_clear = ['login_time', 'login_logged']
+            for key in keys_to_clear:
+                if key in st.session_state:
+                    del st.session_state[key]
             st.logout()
             st.rerun()
 
-        
+
         user_role = get_user_role()
 
         if user_role is None:
             st.error("Acesso Negado. Seu usuário não tem permissão para usar este sistema.")
-            st.warning("Por favor, entre em contato com o administrador para solicitar seu cadastro na planilha 'users'.")
+            st.warning("Por favor, entre em contato com o administrador para solicitar seu cadastro.")
             st.stop() 
 
         if 'login_logged' not in st.session_state:
@@ -54,9 +55,7 @@ def main():
         elif user_role == 'operacional':
             page_options.extend(["Controle de Acesso", "Resumo"])
         
-        default_page_index = 0
-        
-        page = st.sidebar.selectbox("Escolha a página:", page_options, index=default_page_index)
+        page = st.sidebar.selectbox("Escolha a página:", page_options)
         
         if page == "Controle de Acesso":
             vehicle_access_interface()
@@ -65,10 +64,11 @@ def main():
         elif page == "Resumo": 
             summary_page()
     else:
-        if 'login_time' in st.session_state:
-            del st.session_state.login_time
-        if 'login_logged' in st.session_state:
-            del st.session_state.login_logged
+        # Garante que, se o usuário não estiver logado, o estado da sessão seja limpo
+        keys_to_clear = ['login_time', 'login_logged']
+        for key in keys_to_clear:
+            if key in st.session_state:
+                del st.session_state[key]
             
         show_login_page()
         
@@ -76,3 +76,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
