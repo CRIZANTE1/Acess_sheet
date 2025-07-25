@@ -18,7 +18,7 @@ from app.logger import log_action
 def request_blocklist_override_dialog(name, company):
     """Um diálogo para solicitar a liberação de alguém na blocklist."""
     st.write(f"Você está solicitando uma liberação excepcional para **{name}** da empresa **{company}**.")
-    st.warning("Esta pessoa/empresa está na lista de bloqueio permanente. A solicitação requer um motivo forte e será registrada para auditoria.")
+    st.warning("Esta pessoa/empresa está na lista de bloqueio permanente. A solicitação requer um motivo legítimo e será registrada para auditoria.")
     reason = st.text_area("**Motivo da Solicitação Excepcional (obrigatório):**", height=150)
     
     if st.button("Enviar Solicitação para Admin", type="primary"):
