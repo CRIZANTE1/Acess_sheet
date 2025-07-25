@@ -51,7 +51,7 @@ def main():
         
         page_options = []
         if user_role == 'admin':
-            page_options.extend(["Controle de Acesso", "Painel Administrativo", "Resumo"])
+            page_options.extend(["Controle de Acesso", "Agendar Visita", "Painel Administrativo", "Resumo"])
         elif user_role == 'operacional':
             page_options.extend(["Controle de Acesso", "Resumo"])
         
