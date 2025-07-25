@@ -49,10 +49,10 @@ def scheduling_page():
                 time_str,
                 authorizer,
                 status,
-                "" # CheckInTime inicialmente vazio
+                "" 
             ]
             
-            # Usa a função genérica para adicionar dados à aba 'schedules'
+
             if sheet_ops.adc_dados_aba(new_schedule_data, 'schedules'):
                 st.success(f"Visita para '{visitor_name.strip()}' agendada com sucesso para {date_str} às {time_str}!")
                 log_action("CREATE_SCHEDULE", f"Agendou visita para '{visitor_name.strip()}' em {date_str}.")
@@ -61,23 +61,52 @@ def scheduling_page():
 
     st.divider()
     
-    # Visualização dos próximos agendamentos
-    st.header("Próximas Visitas Agendadas")
+    st.header("Status dos Agendamentos")
     schedules_data = sheet_ops.carregar_dados_aba('schedules')
-    if schedules_data and len(schedules_data) > 1:
-        df_schedules = pd.DataFrame(schedules_data[1:], columns=schedules_data[0])
-        df_schedules['ScheduledDateTime'] = pd.to_datetime(df_schedules['ScheduledDate'] + ' ' + df_schedules['ScheduledTime'], format='%d/%m/%Y %H:%M')
-        
-        future_schedules = df_schedules[
-            (df_schedules['Status'] == 'Agendado') &
-            (df_schedules['ScheduledDateTime'] >= get_sao_paulo_time())
-        ].sort_values(by='ScheduledDateTime')
-        
-        if future_schedules.empty:
+    
+    if not schedules_data or len(schedules_data) < 2:
+        st.info("Nenhum agendamento encontrado.")
+        return
+
+    df_schedules = pd.DataFrame(schedules_data[1:], columns=schedules_data[0])
+    df_schedules['ScheduledDate_dt'] = pd.to_datetime(df_schedules['ScheduledDate'], format='%d/%m/%Y', errors='coerce')
+    
+    today = get_sao_paulo_time().normalize() 
+
+    no_shows = df_schedules[
+        (df_schedules['ScheduledDate_dt'] < today) &
+        (df_schedules['Status'] == 'Agendado')
+    ]
+
+    pending_schedules = df_schedules[
+        (df_schedules['ScheduledDate_dt'] >= today) &
+        (df_schedules['Status'] == 'Agendado')
+    ].sort_values(by='ScheduledDate_dt')
+
+    completed_schedules = df_schedules[df_schedules['Status'] == 'Realizado'].sort_values(by='ScheduledDate_dt', ascending=False)
+
+    tab1, tab2, tab3 = st.tabs([f"Pendentes ({len(pending_schedules)})", f"Realizados ({len(completed_schedules)})", f"Não Compareceram ({len(no_shows)})"])
+
+    with tab1:
+        st.subheader("Visitas Agendadas Pendentes")
+        if pending_schedules.empty:
             st.info("Nenhuma visita futura agendada.")
         else:
             st.dataframe(
-                future_schedules[['ScheduledDate', 'ScheduledTime', 'VisitorName', 'Company', 'AuthorizedBy']],
-                hide_index=True,
-                use_container_width=True
+                pending_schedules[['ScheduledDate', 'ScheduledTime', 'VisitorName', 'Company', 'AuthorizedBy']],
+                hide_index=True, use_container_width=True
             )
+    
+    with tab2:
+        st.subheader("Histórico de Visitas Realizadas")
+        st.dataframe(
+            completed_schedules[['ScheduledDate', 'VisitorName', 'Company', 'CheckInTime', 'AuthorizedBy']],
+            hide_index=True, use_container_width=True
+        )
+
+    with tab3:
+        st.subheader("Agendamentos Não Comparecidos (No-Show)")
+        st.dataframe(
+            no_shows[['ScheduledDate', 'VisitorName', 'Company', 'AuthorizedBy']],
+            hide_index=True, use_container_width=True
+        )
