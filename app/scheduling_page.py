@@ -1,4 +1,5 @@
 import streamlit as st
+import pandas as pd # Garanta que pandas está importado
 from datetime import datetime
 from app.operations import SheetOperations
 from auth.auth_utils import get_user_display_name
@@ -23,7 +24,6 @@ def scheduling_page():
         with col2:
             scheduled_time = st.time_input("Hora Estimada da Chegada:")
 
-        # O autorizador é o usuário logado que está fazendo o agendamento
         authorizer = get_user_display_name()
         st.text_input("Autorizado Por:", value=authorizer, disabled=True)
 
@@ -35,7 +35,6 @@ def scheduling_page():
         elif not validate_cpf(visitor_cpf):
             st.error("O CPF informado é inválido.")
         else:
-            # Formata os dados para salvar
             formatted_cpf = format_cpf(visitor_cpf)
             date_str = scheduled_date.strftime("%d/%m/%Y")
             time_str = scheduled_time.strftime("%H:%M")
@@ -49,10 +48,9 @@ def scheduling_page():
                 time_str,
                 authorizer,
                 status,
-                "" 
+                ""
             ]
             
-
             if sheet_ops.adc_dados_aba(new_schedule_data, 'schedules'):
                 st.success(f"Visita para '{visitor_name.strip()}' agendada com sucesso para {date_str} às {time_str}!")
                 log_action("CREATE_SCHEDULE", f"Agendou visita para '{visitor_name.strip()}' em {date_str}.")
@@ -65,13 +63,13 @@ def scheduling_page():
     schedules_data = sheet_ops.carregar_dados_aba('schedules')
     
     if not schedules_data or len(schedules_data) < 2:
-        st.info("Nenhum agendamento encontrado.")
-        return
+        st.info("Nenhum agendamento encontrado para exibir.")
+        return # Interrompe a execução desta seção se não houver dados.
 
     df_schedules = pd.DataFrame(schedules_data[1:], columns=schedules_data[0])
     df_schedules['ScheduledDate_dt'] = pd.to_datetime(df_schedules['ScheduledDate'], format='%d/%m/%Y', errors='coerce')
     
-    today = get_sao_paulo_time().normalize() 
+    today = get_sao_paulo_time().normalize()
 
     no_shows = df_schedules[
         (df_schedules['ScheduledDate_dt'] < today) &
@@ -99,14 +97,20 @@ def scheduling_page():
     
     with tab2:
         st.subheader("Histórico de Visitas Realizadas")
-        st.dataframe(
-            completed_schedules[['ScheduledDate', 'VisitorName', 'Company', 'CheckInTime', 'AuthorizedBy']],
-            hide_index=True, use_container_width=True
-        )
+        if completed_schedules.empty:
+            st.info("Nenhuma visita foi marcada como realizada ainda.")
+        else:
+            st.dataframe(
+                completed_schedules[['ScheduledDate', 'VisitorName', 'Company', 'CheckInTime', 'AuthorizedBy']],
+                hide_index=True, use_container_width=True
+            )
 
     with tab3:
         st.subheader("Agendamentos Não Comparecidos (No-Show)")
-        st.dataframe(
-            no_shows[['ScheduledDate', 'VisitorName', 'Company', 'AuthorizedBy']],
-            hide_index=True, use_container_width=True
-        )
+        if no_shows.empty:
+            st.info("Nenhum agendamento marcado como não comparecido.")
+        else:
+            st.dataframe(
+                no_shows[['ScheduledDate', 'VisitorName', 'Company', 'AuthorizedBy']],
+                hide_index=True, use_container_width=True
+            )
