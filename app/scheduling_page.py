@@ -1,5 +1,5 @@
 import streamlit as st
-import pandas as pd # Garanta que pandas está importado
+import pandas as pd
 from datetime import datetime
 from app.operations import SheetOperations
 from auth.auth_utils import get_user_display_name
@@ -64,20 +64,22 @@ def scheduling_page():
     
     if not schedules_data or len(schedules_data) < 2:
         st.info("Nenhum agendamento encontrado para exibir.")
-        return # Interrompe a execução desta seção se não houver dados.
+        return
 
     df_schedules = pd.DataFrame(schedules_data[1:], columns=schedules_data[0])
+    
     df_schedules['ScheduledDate_dt'] = pd.to_datetime(df_schedules['ScheduledDate'], format='%d/%m/%Y', errors='coerce')
     
-    today = get_sao_paulo_time().normalize()
+    today_date = get_sao_paulo_time().date()
 
     no_shows = df_schedules[
-        (df_schedules['ScheduledDate_dt'] < today) &
+        (df_schedules['ScheduledDate_dt'].dt.date < today_date) &
         (df_schedules['Status'] == 'Agendado')
     ]
 
+
     pending_schedules = df_schedules[
-        (df_schedules['ScheduledDate_dt'] >= today) &
+        (df_schedules['ScheduledDate_dt'].dt.date >= today_date) &
         (df_schedules['Status'] == 'Agendado')
     ].sort_values(by='ScheduledDate_dt')
 
