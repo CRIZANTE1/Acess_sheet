@@ -247,7 +247,7 @@ def admin_page():
     st.title("Painel Administrativo")
     sheet_ops = SheetOperations()
     
-    tab1, tab2, tab3 = st.tabs(["Aprovações Pendentes", "Gerenciar Bloqueios", "Gerenciar Usuários", "Logs do Sistema"])
+    tab1, tab2, tab3, tab4 = st.tabs(["Aprovações Pendentes", "Gerenciar Bloqueios", "Gerenciar Usuários", "Logs do Sistema"])
 
     with tab1:
         display_pending_requests(sheet_ops)
