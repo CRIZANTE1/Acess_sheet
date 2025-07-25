@@ -269,8 +269,30 @@ def vehicle_access_interface():
                         st.session_state.processing = False
                         st.rerun()
     
-    with st.expander("Visualizar todos os registros"):
-        st.dataframe(df.fillna(""), use_container_width=True, hide_index=True)
+        with st.expander("Visualizar todos os registros"):
+            if not df.empty:
+               
+                colunas_para_exibir = [
+                    "Data",
+                    "Horário de Entrada",
+                    "Horário de Saída",
+                    "Nome",
+                    "Empresa",
+                    "Placa",
+                    "Status da Entrada",
+                    "Aprovador"
+                    
+                ]
+                
+                df_visualizacao = df[colunas_para_exibir].copy()
+    
+                st.dataframe(
+                    df_visualizacao.fillna(""), 
+                    use_container_width=True, 
+                    hide_index=True
+                )
+            else:
+                st.info("Nenhum registro para exibir.")
 
 
 
