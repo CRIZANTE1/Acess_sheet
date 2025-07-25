@@ -197,6 +197,27 @@ class SheetOperations:
             logging.error(f"Erro ao excluir linha por valor: {e}", exc_info=True)
             return False
 
+    def editar_dados_aba(self, row_id, updated_data, aba_name):
+        """Edita uma linha em uma aba específica com base no ID."""
+        if not self.credentials or not self.my_archive_google_sheets:
+            return False
+        try:
+            archive = self.credentials.open_by_url(self.my_archive_google_sheets)
+            aba = archive.worksheet_by_title(aba_name)
+            
+            cell = aba.find(str(row_id), matchCase=True, in_column=1)
+            if cell:
+                updated_row = [str(row_id)] + updated_data
+                aba.update_row(cell[0].row, updated_row)
+                return True
+            return False
+        except Exception as e:
+            logging.error(f"Erro ao editar dados na aba '{aba_name}': {e}", exc_info=True)
+            return False
+
+    def editar_dados(self, id, updated_data):
+        """Função de conveniência para editar dados na aba 'acess'."""
+        return self.editar_dados_aba(id, updated_data, 'acess')
 
 
 
