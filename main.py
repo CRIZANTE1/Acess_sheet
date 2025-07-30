@@ -74,8 +74,7 @@ def main():
                 del st.session_state[key]
             
         show_login_page()
-        
-    st.info('Crie uma conta no Google para acesso ao sistema até 29/07/2025, após isso o Portaria BAERI será descontinuado') #Aviso temporario
+
     
     st.caption('Desenvolvido por Cristian Ferreira Carlos, CE9X,+551131038708, cristiancarlos@vibraenergia.com.br')
     
