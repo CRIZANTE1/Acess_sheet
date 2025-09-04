@@ -158,7 +158,7 @@ def vehicle_access_interface():
         st.session_state.processing = False
 
     sheet_operations = SheetOperations()
-
+    st.warning("TODOS DEVEM REALIZAR O TREINAMENTO REGRAS DE OURO ATÉ AMANHÃ")
     with st.expander("TREINAMENTO REGRAS DE OURO", expanded=True):
         st.write("""
         **ATENÇÃO:**
@@ -374,6 +374,7 @@ def vehicle_access_interface():
                 st.info("Nenhum registro para exibir.")
 
     show_scheduled_today(sheet_operations)
+
 
 
 
