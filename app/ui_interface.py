@@ -158,6 +158,16 @@ def vehicle_access_interface():
         st.session_state.processing = False
 
     sheet_operations = SheetOperations()
+
+    with st.expander("TREINAMENTO REGRAS DE OURO", expanded=True):
+        st.write("""
+        **ATENÇÃO:**
+        Todos devem assistir o treinamento até amanhã 05/09!
+        """)
+        try:
+            st.video("https://youtu.be/sH5Sj2Tt0zI")
+        except Exception as e:
+            st.error(f"Erro ao carregar o vídeo: {e}")
     
     with st.expander("Briefing de Segurança e Lembretes", expanded=True):
         st.write("""
@@ -364,5 +374,6 @@ def vehicle_access_interface():
                 st.info("Nenhum registro para exibir.")
 
     show_scheduled_today(sheet_operations)
+
 
 
