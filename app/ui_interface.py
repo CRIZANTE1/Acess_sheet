@@ -165,7 +165,7 @@ def vehicle_access_interface():
         Todos devem assistir o treinamento até amanhã 05/09!
         """)
         try:
-            st.video("https://youtu.be/sH5Sj2Tt0zI")
+            st.video("https://youtu.be/7575Bk4fSSo")
         except Exception as e:
             st.error(f"Erro ao carregar o vídeo: {e}")
     
@@ -374,6 +374,7 @@ def vehicle_access_interface():
                 st.info("Nenhum registro para exibir.")
 
     show_scheduled_today(sheet_operations)
+
 
 
 
