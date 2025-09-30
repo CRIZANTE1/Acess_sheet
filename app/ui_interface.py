@@ -251,17 +251,31 @@ def vehicle_access_interface():
         elif status == "Dentro":
             st.info(f"**{selected_name}** está **DENTRO** da unidade.")
             st.write(f"**Entrada em:** {latest_record['Data']} às {latest_record['Horário de Entrada']}")
-            if st.button(f"✅ Registrar Saída de {selected_name}", use_container_width=True, type="primary", disabled=st.session_state.processing):
+            
+            if st.button(
+                f"✅ Registrar Saída de {selected_name}", 
+                use_container_width=True, 
+                type="primary", 
+                disabled=st.session_state.processing
+            ):
                 st.session_state.processing = True
                 now = get_sao_paulo_time()
-                success, message = update_exit_time(selected_name, now.strftime("%d/%m/%Y"), now.strftime("%H:%M"))
+                
+                success, message = update_exit_time(
+                    selected_name, 
+                    now.strftime("%d/%m/%Y"), 
+                    now.strftime("%H:%M")
+                )
+                
                 if success:
                     log_action("REGISTER_EXIT", f"Registrou saída para '{selected_name}'.")
-                    st.success(message)
+                    st.success(f"✅ {message}")
                     clear_access_cache()
-                else: st.error(message)
-                st.session_state.processing = False
-                st.rerun()
+                    st.session_state.processing = False
+                    st.rerun()
+                else: 
+                    st.error(f"❌ {message}")
+                    st.session_state.processing = False
 
         elif status == "Fora":
             st.success(f"**{selected_name}** está **FORA** da unidade.")
@@ -534,6 +548,7 @@ def vehicle_access_interface():
             st.info("Nenhum registro para exibir.")
 
     show_scheduled_today(sheet_operations)
+
 
 
 
