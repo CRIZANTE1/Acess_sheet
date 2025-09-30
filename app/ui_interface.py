@@ -276,14 +276,26 @@ def vehicle_access_interface():
                 cpf = st.text_input("CPF:", key="novo_cpf")
                 empresa = st.text_input("Empresa:", key="novo_empresa")
                 aprovador = st.selectbox("Aprovador:", options=aprovadores_autorizados, key="novo_aprovador")
-                placa = st.text_input("Placa (Opcional):", key="novo_placa")
+                placa = st.text_input("Placa (Opcional):", key="novo_placa", help="Formatos aceitos: ABC-1234 ou ABC1D23")
+                
+                # Validação em tempo real da placa
+                if placa and placa.strip():
+                    tipo_placa = get_placa_tipo(placa)
+                    if tipo_placa == "Inválida":
+                        st.error("❌ Placa inválida! Use o formato ABC-1234 (antiga) ou ABC1D23 (Mercosul)")
+                    else:
+                        st.success(f"✅ Placa válida - Formato: {tipo_placa}")
+                
                 marca_carro = st.text_input("Marca (Opcional):", key="novo_marca")
-
+        
                 if st.button("➕ Cadastrar e Registrar Entrada", use_container_width=True, type="primary", disabled=st.session_state.processing):
                     if not all([name, cpf, empresa, aprovador]):
                         st.error("Preencha todos os campos obrigatórios.")
                     elif not validate_cpf(cpf):
                         st.error("CPF inválido.")
+                    elif placa and not validate_placa(placa):
+                        st.error("❌ Placa inválida! Corrija antes de continuar.")
+                        st.info("Formatos aceitos: ABC-1234 (antiga) ou ABC1D23 (Mercosul)")
                     else:
                         is_blocked, reason = is_entity_blocked(name.strip(), empresa.strip())
                         if is_blocked:
@@ -292,8 +304,21 @@ def vehicle_access_interface():
                         else:
                             st.session_state.processing = True
                             now = get_sao_paulo_time()
-                            if add_record(name=name.strip(), cpf=format_cpf(cpf), placa=placa, marca_carro=marca_carro, horario_entrada=now.strftime("%H:%M"), data=now.strftime("%d/%m/%Y"), empresa=empresa.strip(), status="Autorizado", motivo="", aprovador=aprovador, first_reg_date=now.strftime("%d/%m/%Y")):
-                                log_action("CREATE_RECORD", f"Cadastrou novo visitante: '{name.strip()}'.")
+                            placa_formatada = format_placa(placa) if placa else ""
+                            if add_record(
+                                name=name.strip(), 
+                                cpf=format_cpf(cpf), 
+                                placa=placa_formatada, 
+                                marca_carro=marca_carro, 
+                                horario_entrada=now.strftime("%H:%M"), 
+                                data=now.strftime("%d/%m/%Y"), 
+                                empresa=empresa.strip(), 
+                                status="Autorizado", 
+                                motivo="", 
+                                aprovador=aprovador, 
+                                first_reg_date=now.strftime("%d/%m/%Y")
+                            ):
+                                log_action("CREATE_RECORD", f"Cadastrou novo visitante: '{name.strip()}'. Placa: {placa_formatada}")
                                 st.success(f"Novo registro para {name} criado com sucesso!")
                                 clear_access_cache()
                             st.session_state.processing = False
@@ -369,6 +394,7 @@ def vehicle_access_interface():
             st.info("Nenhum registro para exibir.")
 
     show_scheduled_today(sheet_operations)
+
 
 
 
