@@ -250,35 +250,7 @@ def vehicle_access_interface():
             
             with st.container(border=True):
                 st.write("Registrar nova entrada:")
-                placa = st.text_input("Placa", value=latest_record.get("Placa", ""), key="fora_placa")
-                empresa = st.text_input("Empresa", value=latest_record.get("Empresa", ""), key="fora_empresa")
-                aprovador = st.selectbox("Aprovador:", options=aprovadores_autorizados, key="fora_aprovador")
-                
-                if st.button(f"▶️ Registrar Entrada de {selected_name}", use_container_width=True, type="primary", disabled=st.session_state.processing):
-                    is_blocked, reason = is_entity_blocked(selected_name, empresa)
-                    if is_blocked:
-                        log_action("BLOCKED_ACCESS_ATTEMPT", f"Tentativa de '{selected_name}' interceptada.")
-                        request_blocklist_override_dialog(selected_name, empresa)
-                    else:
-                        st.session_state.processing = True
-                        now = get_sao_paulo_time()
-                        if add_record(name=selected_name, cpf=str(latest_record.get("CPF", "")), placa=placa, marca_carro=str(latest_record.get("Marca do Carro", "")), horario_entrada=now.strftime("%H:%M"), data=now.strftime("%d/%m/%Y"), empresa=empresa, status="Autorizado", motivo="", aprovador=aprovador, first_reg_date=""):
-                            log_action("REGISTER_ENTRY", f"Registrou nova entrada para '{selected_name}'. Placa: {placa}.")
-                            st.success(f"Nova entrada de {selected_name} registrada!")
-                            clear_access_cache()
-                        st.session_state.processing = False
-                        st.rerun()
-        
-        elif status == "Novo":
-            st.info("Pessoa não encontrada. Preencha o formulário.")
-            with st.container(border=True):
-                st.write("**Formulário de Primeiro Acesso**")
-                st.warning("⚠️ **ATENÇÃO: Esta é a primeira visita. Repassar Briefing de Segurança obrigatoriamente!**")
-                name = st.text_input("Nome Completo:", key="novo_nome")
-                cpf = st.text_input("CPF:", key="novo_cpf")
-                empresa = st.text_input("Empresa:", key="novo_empresa")
-                aprovador = st.selectbox("Aprovador:", options=aprovadores_autorizados, key="novo_aprovador")
-                placa = st.text_input("Placa (Opcional):", key="novo_placa", help="Formatos aceitos: ABC-1234 ou ABC1D23")
+                placa = st.text_input("Placa (Opcional)", value=latest_record.get("Placa", ""), key="fora_placa", max_chars=8, help="Formatos aceitos: ABC-1234 ou ABC1D23")
                 
                 # Validação em tempo real da placa
                 if placa and placa.strip():
@@ -288,41 +260,151 @@ def vehicle_access_interface():
                     else:
                         st.success(f"✅ Placa válida - Formato: {tipo_placa}")
                 
-                marca_carro = st.text_input("Marca (Opcional):", key="novo_marca")
-        
-                if st.button("➕ Cadastrar e Registrar Entrada", use_container_width=True, type="primary", disabled=st.session_state.processing):
-                    if not all([name, cpf, empresa, aprovador]):
-                        st.error("Preencha todos os campos obrigatórios.")
-                    elif not validate_cpf(cpf):
-                        st.error("CPF inválido.")
+                empresa = st.text_input("Empresa", value=latest_record.get("Empresa", ""), key="fora_empresa", max_chars=100)
+                aprovador = st.selectbox("Aprovador:", options=aprovadores_autorizados, key="fora_aprovador")
+                
+                if st.button(f"▶️ Registrar Entrada de {selected_name}", use_container_width=True, type="primary", disabled=st.session_state.processing):
+                    
+                    # Verifica rate limit
+                    user_id = get_user_display_name()
+                    is_allowed, remaining, reset_time = RateLimiter.check_rate_limit(
+                        user_id, 'register_entry', max_attempts=15, time_window=60
+                    )
+                    
+                    if not is_allowed:
+                        show_security_alert(
+                            f"Muitas tentativas de registro. Aguarde {reset_time} segundos.",
+                            "error"
+                        )
+                        st.stop()
+                    
+                    # Valida empresa
+                    is_valid_empresa, result_empresa = SecurityValidator.validate_empresa(empresa)
+                    if not is_valid_empresa:
+                        show_security_alert(f"Empresa inválida: {result_empresa}", "error")
+                        SessionSecurity.record_failed_attempt(user_id, f"Invalid empresa: {result_empresa}")
                     elif placa and not validate_placa(placa):
                         st.error("❌ Placa inválida! Corrija antes de continuar.")
                         st.info("Formatos aceitos: ABC-1234 (antiga) ou ABC1D23 (Mercosul)")
                     else:
-                        is_blocked, reason = is_entity_blocked(name.strip(), empresa.strip())
+                        is_blocked, reason = is_entity_blocked(selected_name, result_empresa)
                         if is_blocked:
-                            log_action("BLOCKED_ACCESS_ATTEMPT", f"Tentativa de '{name.strip()}' interceptada.")
-                            request_blocklist_override_dialog(name.strip(), empresa.strip())
+                            log_action("BLOCKED_ACCESS_ATTEMPT", f"Tentativa de '{selected_name}' interceptada.")
+                            request_blocklist_override_dialog(selected_name, result_empresa)
                         else:
                             st.session_state.processing = True
                             now = get_sao_paulo_time()
                             placa_formatada = format_placa(placa) if placa else ""
+                            
                             if add_record(
-                                name=name.strip(), 
-                                cpf=format_cpf(cpf), 
+                                name=selected_name, 
+                                cpf=str(latest_record.get("CPF", "")), 
                                 placa=placa_formatada, 
-                                marca_carro=marca_carro, 
+                                marca_carro=str(latest_record.get("Marca do Carro", "")), 
                                 horario_entrada=now.strftime("%H:%M"), 
                                 data=now.strftime("%d/%m/%Y"), 
-                                empresa=empresa.strip(), 
+                                empresa=result_empresa, 
+                                status="Autorizado", 
+                                motivo="", 
+                                aprovador=aprovador, 
+                                first_reg_date=""
+                            ):
+                                log_action("REGISTER_ENTRY", f"Registrou nova entrada para '{selected_name}'. Placa: {placa_formatada}.")
+                                st.success(f"Nova entrada de {selected_name} registrada!")
+                                clear_access_cache()
+                            
+                            st.session_state.processing = False
+                            st.rerun()
+        
+        elif status == "Novo":
+            st.info("Pessoa não encontrada. Preencha o formulário.")
+            
+            # Verifica timeout de sessão
+            is_expired, minutes = SessionSecurity.check_session_timeout(timeout_minutes=30)
+            if is_expired:
+                show_security_alert("Sessão expirou por inatividade. Por favor, recarregue a página.", "warning")
+                st.stop()
+            
+            with st.container(border=True):
+                st.write("**Formulário de Primeiro Acesso**")
+                st.warning("⚠️ **ATENÇÃO: Esta é a primeira visita. Repassar Briefing de Segurança obrigatoriamente!**")
+                
+                name = st.text_input("Nome Completo:", key="novo_nome", max_chars=100)
+                cpf = st.text_input("CPF:", key="novo_cpf", max_chars=14)
+                empresa = st.text_input("Empresa:", key="novo_empresa", max_chars=100)
+                aprovador = st.selectbox("Aprovador:", options=aprovadores_autorizados, key="novo_aprovador")
+                placa = st.text_input("Placa (Opcional):", key="novo_placa", max_chars=8, help="Formatos aceitos: ABC-1234 ou ABC1D23")
+                
+                # Validação em tempo real da placa
+                if placa and placa.strip():
+                    tipo_placa = get_placa_tipo(placa)
+                    if tipo_placa == "Inválida":
+                        st.error("❌ Placa inválida! Use o formato ABC-1234 (antiga) ou ABC1D23 (Mercosul)")
+                    else:
+                        st.success(f"✅ Placa válida - Formato: {tipo_placa}")
+                
+                marca_carro = st.text_input("Marca (Opcional):", key="novo_marca", max_chars=50)
+        
+                if st.button("➕ Cadastrar e Registrar Entrada", use_container_width=True, type="primary", disabled=st.session_state.processing):
+                    
+                    # Verifica rate limit
+                    user_id = get_user_display_name()
+                    is_allowed, remaining, reset_time = RateLimiter.check_rate_limit(
+                        user_id, 'create_record', max_attempts=10, time_window=60
+                    )
+                    
+                    if not is_allowed:
+                        show_security_alert(
+                            f"Muitas tentativas de cadastro. Aguarde {reset_time} segundos antes de tentar novamente.",
+                            "error"
+                        )
+                        SessionSecurity.record_failed_attempt(user_id, "Rate limit exceeded on create_record")
+                        st.stop()
+                    
+                    # Validação completa de segurança
+                    is_valid, clean_data, errors = SecurityValidator.validate_all_fields(
+                        name, cpf, empresa, placa, ""
+                    )
+                    
+                    if not is_valid:
+                        show_security_alert("Dados inválidos detectados:", "error")
+                        for error in errors:
+                            st.error(error)
+                        SessionSecurity.record_failed_attempt(user_id, f"Invalid data: {'; '.join(errors)}")
+                    elif not all([name, cpf, empresa, aprovador]):
+                        st.error("Preencha todos os campos obrigatórios.")
+                    else:
+                        # Verifica blocklist
+                        is_blocked, reason = is_entity_blocked(clean_data['name'], clean_data['empresa'])
+                        if is_blocked:
+                            log_action("BLOCKED_ACCESS_ATTEMPT", f"Tentativa de '{clean_data['name']}' interceptada.")
+                            SessionSecurity.record_failed_attempt(user_id, f"Blocked entity: {clean_data['name']}")
+                            request_blocklist_override_dialog(clean_data['name'], clean_data['empresa'])
+                        else:
+                            st.session_state.processing = True
+                            now = get_sao_paulo_time()
+                            
+                            if add_record(
+                                name=clean_data['name'], 
+                                cpf=clean_data['cpf'], 
+                                placa=clean_data['placa'], 
+                                marca_carro=marca_carro.strip() if marca_carro else "", 
+                                horario_entrada=now.strftime("%H:%M"), 
+                                data=now.strftime("%d/%m/%Y"), 
+                                empresa=clean_data['empresa'], 
                                 status="Autorizado", 
                                 motivo="", 
                                 aprovador=aprovador, 
                                 first_reg_date=now.strftime("%d/%m/%Y")
                             ):
-                                log_action("CREATE_RECORD", f"Cadastrou novo visitante: '{name.strip()}'. Placa: {placa_formatada}")
-                                st.success(f"Novo registro para {name} criado com sucesso!")
+                                log_action("CREATE_RECORD", f"Cadastrou novo visitante: '{clean_data['name']}'.")
+                                st.success(f"✅ Novo registro para {clean_data['name']} criado com sucesso!")
+                                
+                                # Reseta rate limit em caso de sucesso
+                                RateLimiter.reset_rate_limit(user_id, 'create_record')
+                                
                                 clear_access_cache()
+                            
                             st.session_state.processing = False
                             st.rerun()
 
@@ -396,6 +478,7 @@ def vehicle_access_interface():
             st.info("Nenhum registro para exibir.")
 
     show_scheduled_today(sheet_operations)
+
 
 
 
