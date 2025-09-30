@@ -202,8 +202,9 @@ class SheetOperations:
         return self.editar_dados_aba(id, updated_data, 'acess')
         
     def excluir_dados(self, id_to_delete):
-    """Função de conveniência para excluir dados da aba 'acess'."""
-    return self.excluir_dados_por_id_aba(id_to_delete, 'acess')
+        """Função de conveniência para excluir dados da aba 'acess'."""
+        return self.excluir_dados_por_id_aba(id_to_delete, 'acess')
+
 
 
 
