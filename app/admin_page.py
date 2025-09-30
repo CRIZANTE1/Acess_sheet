@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 from auth.auth_utils import is_admin, get_user_display_name
+from app.security import SecurityValidator, show_security_alert
+
 from app.operations import SheetOperations
 from app.data_operations import (
     update_record_status, 
@@ -181,11 +183,19 @@ def display_blocklist_management(sheet_ops):
             elif not reason.strip():
                 st.error("O motivo do bloqueio é obrigatório.")
             else:
-                admin_name = get_user_display_name()
-                if add_to_blocklist(block_type, values_to_block, reason, admin_name):
-                    st.success(f"{block_type}(s) bloqueada(s) com sucesso!")
-                    clear_access_cache()
-                    st.rerun()
+                # Valida o motivo
+                clean_reason, errors = SecurityValidator.sanitize_input(reason, "Motivo")
+                
+                if errors:
+                    show_security_alert("Motivo contém caracteres não permitidos:", "error")
+                    for error in errors:
+                        st.error(error)
+                else:
+                    admin_name = get_user_display_name()
+                    if add_to_blocklist(block_type, values_to_block, clean_reason, admin_name):
+                        st.success(f"{block_type}(s) bloqueada(s) com sucesso!")
+                        clear_access_cache()
+                        st.rerun()
     st.divider()
 
     st.subheader("Remover Bloqueios (Liberar Acesso)")
@@ -273,4 +283,5 @@ def admin_page():
             "Data": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         })
     
+
 
