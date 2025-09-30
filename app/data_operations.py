@@ -350,6 +350,50 @@ def update_schedule_status(schedule_id, new_status, checkin_time):
         st.error(f"Erro ao atualizar status do agendamento: {e}")
         return False
 
+def check_briefing_needed(person_name, df):
+    """
+    Verifica se o briefing de segurança precisa ser repassado.
+    Retorna True se a pessoa não tem registro ou o último acesso foi há mais de 1 ano.
+    """
+    try:
+        if df.empty:
+            return True, "Primeira visita"
+        
+        person_records = df[df["Nome"] == person_name].copy()
+        if person_records.empty:
+            return True, "Primeira visita"
+        
+        # Procura pela data do primeiro registro
+        first_reg_date = person_records.iloc[0].get("Data do Primeiro Registro", "")
+        
+        if not first_reg_date or pd.isna(first_reg_date) or str(first_reg_date).strip() == "":
+            # Se não tem data do primeiro registro, usa a data mais antiga
+            person_records['Data_dt'] = pd.to_datetime(person_records['Data'], format='%d/%m/%Y', errors='coerce')
+            person_records = person_records.dropna(subset=['Data_dt']).sort_values('Data_dt')
+            
+            if person_records.empty:
+                return True, "Sem histórico válido"
+            
+            first_date = person_records.iloc[0]['Data_dt']
+        else:
+            first_date = pd.to_datetime(first_reg_date, format='%d/%m/%Y', errors='coerce')
+        
+        if pd.isna(first_date):
+            return True, "Data inválida no histórico"
+        
+        now = get_sao_paulo_time()
+        days_since_first = (now - first_date).days
+        
+        if days_since_first > 365:
+            return True, f"Último acesso há {days_since_first} dias (mais de 1 ano)"
+        
+        return False, f"Último acesso há {days_since_first} dias"
+        
+    except Exception as e:
+        print(f"Erro em check_briefing_needed: {e}")
+        return False, "Erro ao verificar briefing"
+
+
 
 
 
