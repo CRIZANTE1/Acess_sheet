@@ -15,6 +15,8 @@ from auth.auth_utils import get_user_display_name, is_admin
 from app.logger import log_action
 from app.data_operations import update_schedule_status
 from app.security import SecurityValidator, RateLimiter, SessionSecurity, show_security_alert
+from app.widgets import aprovador_selector_with_confirmation
+
 
 
 
@@ -262,34 +264,11 @@ def vehicle_access_interface():
                 
                 empresa = st.text_input("Empresa", value=latest_record.get("Empresa", ""), key="fora_empresa", max_chars=100)
                 
-                # Seleção do aprovador com destaque
-                st.markdown("### 👤 Autorização de Acesso")
-                col_aprovador, col_confirma = st.columns([2, 1])
-                
-                with col_aprovador:
-                    aprovador = st.selectbox(
-                        "Selecione o Aprovador Responsável:", 
-                        options=[""] + aprovadores_autorizados, 
-                        key="fora_aprovador",
-                        help="Selecione quem está autorizando este acesso"
-                    )
-                
-                with col_confirma:
-                    if aprovador and aprovador != "":
-                        aprovador_ciente = st.checkbox(
-                            "✓ Aprovador está ciente?",
-                            key="fora_aprovador_ciente",
-                            help=f"Confirme que {aprovador} está ciente e autoriza esta entrada"
-                        )
-                    else:
-                        aprovador_ciente = False
-                        st.info("Selecione um aprovador")
-                
-                # Alerta se aprovador não foi selecionado
-                if not aprovador or aprovador == "":
-                    st.warning("⚠️ **Você deve selecionar um aprovador responsável pela autorização.**")
-                elif not aprovador_ciente:
-                    st.warning(f"⚠️ **Confirme que {aprovador} está ciente desta entrada.**")
+                # Usa o widget de aprovador
+                aprovador, aprovador_ciente = aprovador_selector_with_confirmation(
+                    aprovadores_autorizados,
+                    key_prefix="fora"
+                )
                 
                 # Botão desabilitado se não tiver aprovador ou confirmação
                 button_disabled = st.session_state.processing or not aprovador or aprovador == "" or not aprovador_ciente
@@ -369,34 +348,11 @@ def vehicle_access_interface():
                 cpf = st.text_input("CPF:", key="novo_cpf", max_chars=14)
                 empresa = st.text_input("Empresa:", key="novo_empresa", max_chars=100)
                 
-                # Seleção do aprovador com destaque
-                st.markdown("### 👤 Autorização de Acesso")
-                col_aprovador, col_confirma = st.columns([2, 1])
-                
-                with col_aprovador:
-                    aprovador = st.selectbox(
-                        "Selecione o Aprovador Responsável:", 
-                        options=[""] + aprovadores_autorizados, 
-                        key="novo_aprovador",
-                        help="Selecione quem está autorizando este acesso"
-                    )
-                
-                with col_confirma:
-                    if aprovador and aprovador != "":
-                        aprovador_ciente = st.checkbox(
-                            "✓ Aprovador está ciente?",
-                            key="novo_aprovador_ciente",
-                            help=f"Confirme que {aprovador} está ciente e autoriza esta entrada"
-                        )
-                    else:
-                        aprovador_ciente = False
-                        st.info("Selecione um aprovador")
-                
-                # Alerta se aprovador não foi selecionado
-                if not aprovador or aprovador == "":
-                    st.warning("⚠️ **Você deve selecionar um aprovador responsável pela autorização.**")
-                elif not aprovador_ciente:
-                    st.warning(f"⚠️ **Confirme que {aprovador} está ciente desta entrada.**")
+                # Usa o widget de aprovador
+                aprovador, aprovador_ciente = aprovador_selector_with_confirmation(
+                    aprovadores_autorizados,
+                    key_prefix="novo"
+                )
                 
                 st.divider()
                 
@@ -411,7 +367,7 @@ def vehicle_access_interface():
                         st.success(f"✅ Placa válida - Formato: {tipo_placa}")
                 
                 marca_carro = st.text_input("Marca (Opcional):", key="novo_marca", max_chars=50)
-        
+
                 # Botão desabilitado se não tiver aprovador ou confirmação
                 button_disabled = st.session_state.processing or not aprovador or aprovador == "" or not aprovador_ciente
                 
@@ -555,6 +511,7 @@ def vehicle_access_interface():
             st.info("Nenhum registro para exibir.")
 
     show_scheduled_today(sheet_operations)
+
 
 
 
