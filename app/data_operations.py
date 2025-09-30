@@ -43,7 +43,8 @@ def update_exit_time(name, exit_date_str, exit_time_str):
         if not all_data or len(all_data) < 2:
             return False, "Não foi possível carregar os dados da planilha."
         
-        df = pd.DataFrame(all_data[1:], columns=all_data[0])
+        header = all_data[0]
+        df = pd.DataFrame(all_data[1:], columns=header)
         
         # Encontra os registros em aberto (sem horário de saída) para a pessoa especificada
         open_records = df[
@@ -64,22 +65,26 @@ def update_exit_time(name, exit_date_str, exit_time_str):
         except ValueError as e:
             return False, f"Erro ao processar datas: {e}"
 
+        # Pega os índices das colunas
+        try:
+            exit_time_index = header.index("Horário de Saída")
+        except ValueError:
+            return False, "Coluna 'Horário de Saída' não encontrada na planilha."
+
         # Caso 1: Saída no mesmo dia da entrada
         if entry_date.date() == exit_date.date():
+            # Encontra a linha original nos dados
             original_row = next((row for row in all_data if str(row[0]) == str(record_id)), None)
             if original_row is None: 
                 return False, "Registro original não encontrado para edição."
             
-            header = all_data[0]
+            # Cria uma cópia dos dados sem o ID
+            updated_data = list(original_row[1:])
             
-            try:
-                exit_time_index = header.index("Horário de Saída")
-            except ValueError:
-                return False, "Coluna 'Horário de Saída' não encontrada na planilha."
-            
-            updated_data = original_row[1:]  # Pega os dados sem o ID
+            # Atualiza o horário de saída (índice - 1 porque removemos o ID)
             updated_data[exit_time_index - 1] = exit_time_str 
             
+            # Usa o método correto editar_dados (que chama editar_dados_aba internamente)
             if sheet_operations.editar_dados(record_id, updated_data):
                 return True, "Horário de saída atualizado com sucesso."
             return False, "Falha ao editar o registro na planilha."
@@ -91,14 +96,7 @@ def update_exit_time(name, exit_date_str, exit_time_str):
             if original_row is None:
                 return False, "Registro original não encontrado."
             
-            header = all_data[0]
-            
-            try:
-                exit_time_index = header.index("Horário de Saída")
-            except ValueError:
-                return False, "Coluna 'Horário de Saída' não encontrada na planilha."
-            
-            updated_data = original_row[1:]
+            updated_data = list(original_row[1:])
             updated_data[exit_time_index - 1] = "23:59"
             
             if not sheet_operations.editar_dados(record_id, updated_data):
@@ -122,9 +120,8 @@ def update_exit_time(name, exit_date_str, exit_time_str):
                     ""
                 ]
                 
-                if not sheet_operations.adc_dados_aba(intermediate_data, 'acess'):
-                    return False, f"Falha ao criar registro intermediário para {current_date.strftime('%d/%m/%Y')}."
-                
+                # Usa adc_dados que adiciona à aba 'acess' por padrão
+                sheet_operations.adc_dados(intermediate_data)
                 current_date += timedelta(days=1)
 
             # Cria registro final com horário de saída real
@@ -143,9 +140,7 @@ def update_exit_time(name, exit_date_str, exit_time_str):
                 ""
             ]
             
-            if not sheet_operations.adc_dados_aba(final_data, 'acess'):
-                return False, "Falha ao criar registro de saída final."
-            
+            sheet_operations.adc_dados(final_data)
             return True, "Registros de pernoite criados com sucesso."
             
     except Exception as e:
@@ -153,7 +148,6 @@ def update_exit_time(name, exit_date_str, exit_time_str):
         error_details = traceback.format_exc()
         print(f"Erro detalhado em update_exit_time: {error_details}")
         return False, f"Erro ao atualizar horário de saída: {str(e)}"
-
 
 def update_record_status(record_id, new_status, approver_name):
     """
@@ -496,6 +490,7 @@ def check_briefing_needed(person_name, df):
     except Exception as e:
         print(f"Erro em check_briefing_needed: {e}")
         return False, "Erro ao verificar briefing"
+
 
 
 
