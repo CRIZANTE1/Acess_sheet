@@ -6,10 +6,11 @@ from app.data_operations import (
     update_exit_time, 
     delete_record_by_id, 
     check_blocked_records,
-    is_entity_blocked
+    is_entity_blocked,
+    check_briefing_needed
 )
 from app.operations import SheetOperations
-from app.utils import format_cpf, validate_cpf, get_sao_paulo_time
+from app.utils import format_cpf, validate_cpf, get_sao_paulo_time, clear_access_cache
 from auth.auth_utils import get_user_display_name, is_admin
 from app.logger import log_action
 from app.data_operations import update_schedule_status
@@ -38,7 +39,7 @@ def request_blocklist_override_dialog(name, company):
             ):
                 log_action("REQUEST_BLOCKLIST_OVERRIDE", f"Solicitou liberação da blocklist para '{name}'. Motivo: {reason.strip()}")
                 st.success("Sua solicitação excepcional foi enviada para o administrador.")
-                if 'df_acesso_veiculos' in st.session_state: del st.session_state.df_acesso_veiculos
+                clear_access_cache()
                 st.rerun()
         else:
             st.error("O motivo é obrigatório para enviar a solicitação.")
@@ -107,8 +108,7 @@ def show_scheduled_today(sheet_ops):
                         if update_schedule_status(schedule_id, "Realizado", now.strftime("%H:%M")):
                             st.success(f"Chegada de {visitor_name} registrada com sucesso!")
                             log_action("CHECK_IN", f"Check-in realizado para a visita agendada de '{visitor_name}'.")
-                            if 'df_acesso_veiculos' in st.session_state:
-                                del st.session_state.df_acesso_veiculos
+                            clear_access_cache()
                             st.rerun()
                             
 def get_person_status(name, df):
@@ -144,7 +144,7 @@ def show_people_inside(df, sheet_operations):
                 if success:
                     log_action("REGISTER_EXIT", f"Registrou saída para '{row['Nome']}'.")
                     st.success(f"Saída de {row['Nome']} registrada!")
-                    if 'df_acesso_veiculos' in st.session_state: del st.session_state.df_acesso_veiculos
+                    clear_access_cache()
                 else: st.error(message)
                 st.session_state.processing = False
                 st.rerun()
@@ -158,18 +158,8 @@ def vehicle_access_interface():
         st.session_state.processing = False
 
     sheet_operations = SheetOperations()
-    st.warning("TODOS DEVEM REALIZAR O TREINAMENTO REGRAS DE OURO ATÉ AMANHÃ")
-    with st.expander("TREINAMENTO REGRAS DE OURO", expanded=True):
-        st.write("""
-        **ATENÇÃO:**
-        Todos devem assistir o treinamento até amanhã 05/09!
-        """)
-        try:
-            st.video("https://youtu.be/5PzfLwcs-C8")
-        except Exception as e:
-            st.error(f"Erro ao carregar o vídeo: {e}")
     
-    with st.expander("Briefing de Segurança e Lembretes", expanded=True):
+    with st.expander("Briefing de Segurança e Lembretes", expanded=False):
         st.write("""
         **ATENÇÃO:**
         1. O acesso de veículos deve ser controlado rigorosamente para garantir a segurança do local.
@@ -227,7 +217,7 @@ def vehicle_access_interface():
                     if add_record(name=selected_name, cpf=str(latest_record.get("CPF", "")), placa="", marca_carro="", horario_entrada=now.strftime("%H:%M"), data=now.strftime("%d/%m/%Y"), empresa=str(latest_record.get("Empresa", "")), status="Pendente de Aprovação", motivo=f"Solicitação para bloqueio: '{motivo}'", aprovador=requester_name, first_reg_date=""):
                         log_action("REQUEST_ACCESS", f"Solicitou liberação para '{selected_name}'. Motivo: {motivo}")
                         st.success(f"Solicitação para {selected_name} enviada para o administrador!")
-                        if 'df_acesso_veiculos' in st.session_state: del st.session_state.df_acesso_veiculos
+                        clear_access_cache()
                     st.session_state.processing = False
                     st.rerun()
 
@@ -241,7 +231,7 @@ def vehicle_access_interface():
                 if success:
                     log_action("REGISTER_EXIT", f"Registrou saída para '{selected_name}'.")
                     st.success(message)
-                    if 'df_acesso_veiculos' in st.session_state: del st.session_state.df_acesso_veiculos
+                    clear_access_cache()
                 else: st.error(message)
                 st.session_state.processing = False
                 st.rerun()
@@ -249,6 +239,12 @@ def vehicle_access_interface():
         elif status == "Fora":
             st.success(f"**{selected_name}** está **FORA** da unidade.")
             st.write(f"**Última saída em:** {latest_record.get('Data', 'N/A')} às {latest_record.get('Horário de Saída', 'N/A')}")
+            
+            # Verifica se precisa repassar o briefing
+            needs_briefing, briefing_reason = check_briefing_needed(selected_name, df)
+            if needs_briefing:
+                st.warning(f"⚠️ **ATENÇÃO: Repassar Briefing de Segurança!**")
+                st.info(f"Motivo: {briefing_reason}")
             
             with st.container(border=True):
                 st.write("Registrar nova entrada:")
@@ -267,7 +263,7 @@ def vehicle_access_interface():
                         if add_record(name=selected_name, cpf=str(latest_record.get("CPF", "")), placa=placa, marca_carro=str(latest_record.get("Marca do Carro", "")), horario_entrada=now.strftime("%H:%M"), data=now.strftime("%d/%m/%Y"), empresa=empresa, status="Autorizado", motivo="", aprovador=aprovador, first_reg_date=""):
                             log_action("REGISTER_ENTRY", f"Registrou nova entrada para '{selected_name}'. Placa: {placa}.")
                             st.success(f"Nova entrada de {selected_name} registrada!")
-                            if 'df_acesso_veiculos' in st.session_state: del st.session_state.df_acesso_veiculos
+                            clear_access_cache()
                         st.session_state.processing = False
                         st.rerun()
         
@@ -275,6 +271,7 @@ def vehicle_access_interface():
             st.info("Pessoa não encontrada. Preencha o formulário.")
             with st.container(border=True):
                 st.write("**Formulário de Primeiro Acesso**")
+                st.warning("⚠️ **ATENÇÃO: Esta é a primeira visita. Repassar Briefing de Segurança obrigatoriamente!**")
                 name = st.text_input("Nome Completo:", key="novo_nome")
                 cpf = st.text_input("CPF:", key="novo_cpf")
                 empresa = st.text_input("Empresa:", key="novo_empresa")
@@ -298,7 +295,7 @@ def vehicle_access_interface():
                             if add_record(name=name.strip(), cpf=format_cpf(cpf), placa=placa, marca_carro=marca_carro, horario_entrada=now.strftime("%H:%M"), data=now.strftime("%d/%m/%Y"), empresa=empresa.strip(), status="Autorizado", motivo="", aprovador=aprovador, first_reg_date=now.strftime("%d/%m/%Y")):
                                 log_action("CREATE_RECORD", f"Cadastrou novo visitante: '{name.strip()}'.")
                                 st.success(f"Novo registro para {name} criado com sucesso!")
-                                if 'df_acesso_veiculos' in st.session_state: del st.session_state.df_acesso_veiculos
+                                clear_access_cache()
                             st.session_state.processing = False
                             st.rerun()
 
@@ -325,7 +322,7 @@ def vehicle_access_interface():
                             if add_record(name=str(person_to_block), cpf=str(last_record.get("CPF", "")), placa="", marca_carro="", horario_entrada=now.strftime("%H:%M"), data=now.strftime("%d/%m/%Y"), empresa=str(last_record.get("Empresa", "")), status="Bloqueado", motivo=motivo, aprovador="Admin", first_reg_date=""):
                                 log_action("BLOCK_USER", f"Bloqueou o usuário '{person_to_block}'. Motivo: {motivo}.")
                                 st.success(f"{person_to_block} foi bloqueado com sucesso.")
-                                if 'df_acesso_veiculos' in st.session_state: del st.session_state.df_acesso_veiculos
+                                clear_access_cache()
                         else:
                             st.error("O motivo é obrigatório e a pessoa deve ter pelo menos um registro anterior.")
                         st.session_state.processing = False
@@ -342,39 +339,36 @@ def vehicle_access_interface():
                             if delete_record_by_id(last_record_id):
                                 log_action("DELETE_RECORD", f"Deletou o último registro de '{person_to_delete}' (ID: {last_record_id}).")
                                 st.success(f"Último registro de {person_to_delete} deletado com sucesso.")
-                                if 'df_acesso_veiculos' in st.session_state: del st.session_state.df_acesso_veiculos
+                                clear_access_cache()
                             else: st.error("Falha ao deletar o registro.")
                         else: st.warning(f"Nenhum registro encontrado para {person_to_delete}.")
                         st.session_state.processing = False
                         st.rerun()
     
     with st.expander("Visualizar todos os registros"):
-            if not df.empty:
-               
-                colunas_para_exibir = [
-                    "Data",
-                    "Horário de Entrada",
-                    "Horário de Saída",
-                    "Nome",
-                    "Empresa",
-                    "Placa",
-                    "Status da Entrada",
-                    "Aprovador"
-                    
-                ]
-                
-                df_visualizacao = df[colunas_para_exibir].copy()
-    
-                st.dataframe(
-                    df_visualizacao.fillna(""), 
-                    use_container_width=True, 
-                    hide_index=True
-                )
-            else:
-                st.info("Nenhum registro para exibir.")
+        if not df.empty:
+            colunas_para_exibir = [
+                "Data",
+                "Horário de Entrada",
+                "Horário de Saída",
+                "Nome",
+                "Empresa",
+                "Placa",
+                "Status da Entrada",
+                "Aprovador"
+            ]
+            
+            df_visualizacao = df[colunas_para_exibir].copy()
+
+            st.dataframe(
+                df_visualizacao.fillna(""), 
+                use_container_width=True, 
+                hide_index=True
+            )
+        else:
+            st.info("Nenhum registro para exibir.")
 
     show_scheduled_today(sheet_operations)
-
 
 
 
