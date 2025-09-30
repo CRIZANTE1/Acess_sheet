@@ -51,7 +51,7 @@ class SheetOperations:
             valid_columns_indices = [i for i, col_name in enumerate(header) if col_name.strip()]
             
             if not valid_columns_indices:
-                return [[]] # Retorna lista com lista vazia para indicar cabeçalho vazio
+                return [[]]
 
             filtered_data = [[header[i] for i in valid_columns_indices]]
             for row in data[1:]:
@@ -85,6 +85,8 @@ class SheetOperations:
                     aba.update_row(1, ["ID", "Nome", "CPF", "Placa", "Marca do Carro", "Horário de Entrada", "Horário de Saída", "Data", "Empresa", "Status da Entrada", "Motivo do Bloqueio", "Aprovador", "Data do Primeiro Registro"])
                 elif aba_name == 'logs':
                     aba.update_row(1, ["Timestamp", "User", "Action", "Details"])
+                elif aba_name == 'schedules':
+                    aba.update_row(1, ["ID", "VisitorName", "VisitorCPF", "Company", "ScheduledDate", "ScheduledTime", "AuthorizedBy", "Status", "CheckInTime"])
             
             all_values = aba.get_all_values()
             existing_ids = [row[0] for row in all_values[1:] if row and row[0]]
@@ -108,26 +110,41 @@ class SheetOperations:
         else:
             st.error("Falha ao adicionar dados na planilha 'acess'.")
 
-    def editar_dados(self, id, updated_data):
-        """Edita uma linha na aba 'acess'."""
+    def editar_dados_aba(self, row_id, updated_data, aba_name):
+        """Edita uma linha em uma aba específica com base no ID."""
         if not self.credentials or not self.my_archive_google_sheets:
             return False
         try:
             archive = self.credentials.open_by_url(self.my_archive_google_sheets)
-            aba = archive.worksheet_by_title('acess')
-            data = aba.get_all_values()
+            aba = archive.worksheet_by_title(aba_name)
             
-            for i, row in enumerate(data):
-                if row and row[0] == str(id):
-                    updated_row = [str(id)] + updated_data
-                    aba.update_row(i + 1, updated_row)
-                    return True
-            return False
+            all_values = aba.get_all_values()
+            row_to_update_index = -1
+            
+            # Itera sobre as linhas para encontrar o ID
+            for i, row in enumerate(all_values):
+                # Compara o valor da primeira coluna (ID)
+                if row and str(row[0]) == str(row_id):
+                    row_to_update_index = i + 1
+                    break
+            
+            if row_to_update_index != -1:
+                updated_row = [str(row_id)] + updated_data
+                aba.update_row(row_to_update_index, updated_row)
+                logging.info(f"Dados do ID {row_id} editados com sucesso na aba '{aba_name}'.")
+                return True
+            else:
+                logging.error(f"ID {row_id} não encontrado na aba '{aba_name}' para edição.")
+                return False
+                
         except Exception as e:
-            logging.error(f"Erro ao editar dados: {e}", exc_info=True)
+            logging.error(f"Erro ao editar dados na aba '{aba_name}': {e}", exc_info=True)
+            st.error(f"Erro crítico ao tentar editar dados: {e}")
             return False
 
-
+    def editar_dados(self, id, updated_data):
+        """Função de conveniência para editar dados na aba 'acess'."""
+        return self.editar_dados_aba(id, updated_data, 'acess')
 
     def excluir_dados_por_id_aba(self, id_to_delete, aba_name):
         """Exclui uma linha de uma aba específica com base no ID."""
@@ -138,21 +155,18 @@ class SheetOperations:
             aba = archive.worksheet_by_title(aba_name)
             
             all_values = aba.get_all_values()
-            
             row_to_delete_index = -1
-            for i, row in enumerate(all_values[1:]):
+            
+            for i, row in enumerate(all_values):
                 if row and str(row[0]) == str(id_to_delete):
-                    # i+2 porque começamos no índice 1 e as linhas da planilha começam em 1 (i=0 -> linha 2)
-                    row_to_delete_index = i + 2 
-                    break # Encontrou, pode parar de procurar
+                    row_to_delete_index = i + 1
+                    break
 
             if row_to_delete_index != -1:
-                # Se encontrou a linha, deleta pelo seu índice
                 aba.delete_rows(row_to_delete_index)
                 logging.info(f"Dados do ID {id_to_delete} excluídos com sucesso da aba '{aba_name}'.")
                 return True
             else:
-                # Se o loop terminar e não encontrar, registra o erro
                 logging.error(f"ID {id_to_delete} não encontrado na aba '{aba_name}'.")
                 st.warning(f"Não foi possível encontrar o registro com ID {id_to_delete} para exclusão.")
                 return False
@@ -161,6 +175,10 @@ class SheetOperations:
             logging.error(f"Erro ao excluir dados da aba '{aba_name}': {e}", exc_info=True)
             st.error(f"Erro crítico ao tentar excluir dados: {e}")
             return False
+
+    def excluir_dados(self, id_to_delete):
+        """Função de conveniência para excluir dados da aba 'acess'."""
+        return self.excluir_dados_por_id_aba(id_to_delete, 'acess')
 
     def excluir_linha_por_valor(self, valor_busca, nome_coluna, nome_aba):
         """Exclui a primeira linha encontrada que corresponde a um valor em uma coluna específica."""
@@ -196,17 +214,6 @@ class SheetOperations:
         except Exception as e:
             logging.error(f"Erro ao excluir linha por valor: {e}", exc_info=True)
             return False
-
-    def editar_dados(self, id, updated_data):
-        """Função de conveniência para editar dados na aba 'acess'."""
-        return self.editar_dados_aba(id, updated_data, 'acess')
-        
-    def excluir_dados(self, id_to_delete):
-        """Função de conveniência para excluir dados da aba 'acess'."""
-        return self.excluir_dados_por_id_aba(id_to_delete, 'acess')
-
-
-
 
 
 
