@@ -7,17 +7,23 @@ from app.data_operations import (
     delete_record_by_id, 
     check_blocked_records,
     is_entity_blocked,
-    check_briefing_needed
+    check_briefing_needed,
+    update_schedule_status
 )
 from app.operations import SheetOperations
-from app.utils import format_cpf, validate_cpf, get_sao_paulo_time, clear_access_cache
-from auth.auth_utils import get_user_display_name, is_admin
-from app.logger import log_action
-from app.data_operations import update_schedule_status
+from app.utils import (
+    format_cpf, 
+    validate_cpf, 
+    get_sao_paulo_time, 
+    clear_access_cache, 
+    validate_placa, 
+    format_placa, 
+    get_placa_tipo
+)
 from app.security import SecurityValidator, RateLimiter, SessionSecurity, show_security_alert
 from app.widgets import aprovador_selector_with_confirmation
-
-
+from auth.auth_utils import get_user_display_name, is_admin
+from app.logger import log_action
 
 
 @st.dialog("Solicitar Liberação Excepcional")
@@ -511,6 +517,7 @@ def vehicle_access_interface():
             st.info("Nenhum registro para exibir.")
 
     show_scheduled_today(sheet_operations)
+
 
 
 
