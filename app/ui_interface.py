@@ -261,9 +261,45 @@ def vehicle_access_interface():
                         st.success(f"✅ Placa válida - Formato: {tipo_placa}")
                 
                 empresa = st.text_input("Empresa", value=latest_record.get("Empresa", ""), key="fora_empresa", max_chars=100)
-                aprovador = st.selectbox("Aprovador:", options=aprovadores_autorizados, key="fora_aprovador")
                 
-                if st.button(f"▶️ Registrar Entrada de {selected_name}", use_container_width=True, type="primary", disabled=st.session_state.processing):
+                # Seleção do aprovador com destaque
+                st.markdown("### 👤 Autorização de Acesso")
+                col_aprovador, col_confirma = st.columns([2, 1])
+                
+                with col_aprovador:
+                    aprovador = st.selectbox(
+                        "Selecione o Aprovador Responsável:", 
+                        options=[""] + aprovadores_autorizados, 
+                        key="fora_aprovador",
+                        help="Selecione quem está autorizando este acesso"
+                    )
+                
+                with col_confirma:
+                    if aprovador and aprovador != "":
+                        aprovador_ciente = st.checkbox(
+                            "✓ Aprovador está ciente?",
+                            key="fora_aprovador_ciente",
+                            help=f"Confirme que {aprovador} está ciente e autoriza esta entrada"
+                        )
+                    else:
+                        aprovador_ciente = False
+                        st.info("Selecione um aprovador")
+                
+                # Alerta se aprovador não foi selecionado
+                if not aprovador or aprovador == "":
+                    st.warning("⚠️ **Você deve selecionar um aprovador responsável pela autorização.**")
+                elif not aprovador_ciente:
+                    st.warning(f"⚠️ **Confirme que {aprovador} está ciente desta entrada.**")
+                
+                # Botão desabilitado se não tiver aprovador ou confirmação
+                button_disabled = st.session_state.processing or not aprovador or aprovador == "" or not aprovador_ciente
+                
+                if st.button(
+                    f"▶️ Registrar Entrada de {selected_name}", 
+                    use_container_width=True, 
+                    type="primary", 
+                    disabled=button_disabled
+                ):
                     
                     # Verifica rate limit
                     user_id = get_user_display_name()
@@ -309,8 +345,8 @@ def vehicle_access_interface():
                                 aprovador=aprovador, 
                                 first_reg_date=""
                             ):
-                                log_action("REGISTER_ENTRY", f"Registrou nova entrada para '{selected_name}'. Placa: {placa_formatada}.")
-                                st.success(f"Nova entrada de {selected_name} registrada!")
+                                log_action("REGISTER_ENTRY", f"Registrou nova entrada para '{selected_name}'. Placa: {placa_formatada}. Aprovador: {aprovador} (confirmado ciente)")
+                                st.success(f"✅ Nova entrada de {selected_name} registrada e autorizada por {aprovador}!")
                                 clear_access_cache()
                             
                             st.session_state.processing = False
@@ -332,7 +368,38 @@ def vehicle_access_interface():
                 name = st.text_input("Nome Completo:", key="novo_nome", max_chars=100)
                 cpf = st.text_input("CPF:", key="novo_cpf", max_chars=14)
                 empresa = st.text_input("Empresa:", key="novo_empresa", max_chars=100)
-                aprovador = st.selectbox("Aprovador:", options=aprovadores_autorizados, key="novo_aprovador")
+                
+                # Seleção do aprovador com destaque
+                st.markdown("### 👤 Autorização de Acesso")
+                col_aprovador, col_confirma = st.columns([2, 1])
+                
+                with col_aprovador:
+                    aprovador = st.selectbox(
+                        "Selecione o Aprovador Responsável:", 
+                        options=[""] + aprovadores_autorizados, 
+                        key="novo_aprovador",
+                        help="Selecione quem está autorizando este acesso"
+                    )
+                
+                with col_confirma:
+                    if aprovador and aprovador != "":
+                        aprovador_ciente = st.checkbox(
+                            "✓ Aprovador está ciente?",
+                            key="novo_aprovador_ciente",
+                            help=f"Confirme que {aprovador} está ciente e autoriza esta entrada"
+                        )
+                    else:
+                        aprovador_ciente = False
+                        st.info("Selecione um aprovador")
+                
+                # Alerta se aprovador não foi selecionado
+                if not aprovador or aprovador == "":
+                    st.warning("⚠️ **Você deve selecionar um aprovador responsável pela autorização.**")
+                elif not aprovador_ciente:
+                    st.warning(f"⚠️ **Confirme que {aprovador} está ciente desta entrada.**")
+                
+                st.divider()
+                
                 placa = st.text_input("Placa (Opcional):", key="novo_placa", max_chars=8, help="Formatos aceitos: ABC-1234 ou ABC1D23")
                 
                 # Validação em tempo real da placa
@@ -345,7 +412,15 @@ def vehicle_access_interface():
                 
                 marca_carro = st.text_input("Marca (Opcional):", key="novo_marca", max_chars=50)
         
-                if st.button("➕ Cadastrar e Registrar Entrada", use_container_width=True, type="primary", disabled=st.session_state.processing):
+                # Botão desabilitado se não tiver aprovador ou confirmação
+                button_disabled = st.session_state.processing or not aprovador or aprovador == "" or not aprovador_ciente
+                
+                if st.button(
+                    "➕ Cadastrar e Registrar Entrada", 
+                    use_container_width=True, 
+                    type="primary", 
+                    disabled=button_disabled
+                ):
                     
                     # Verifica rate limit
                     user_id = get_user_display_name()
@@ -372,7 +447,9 @@ def vehicle_access_interface():
                             st.error(error)
                         SessionSecurity.record_failed_attempt(user_id, f"Invalid data: {'; '.join(errors)}")
                     elif not all([name, cpf, empresa, aprovador]):
-                        st.error("Preencha todos os campos obrigatórios.")
+                        st.error("❌ Preencha todos os campos obrigatórios, incluindo o aprovador.")
+                    elif not aprovador_ciente:
+                        st.error("❌ Você deve confirmar que o aprovador está ciente desta entrada.")
                     else:
                         # Verifica blocklist
                         is_blocked, reason = is_entity_blocked(clean_data['name'], clean_data['empresa'])
@@ -397,8 +474,8 @@ def vehicle_access_interface():
                                 aprovador=aprovador, 
                                 first_reg_date=now.strftime("%d/%m/%Y")
                             ):
-                                log_action("CREATE_RECORD", f"Cadastrou novo visitante: '{clean_data['name']}'.")
-                                st.success(f"✅ Novo registro para {clean_data['name']} criado com sucesso!")
+                                log_action("CREATE_RECORD", f"Cadastrou novo visitante: '{clean_data['name']}'. Aprovador: {aprovador} (confirmado ciente)")
+                                st.success(f"✅ Novo registro para {clean_data['name']} criado com sucesso e autorizado por {aprovador}!")
                                 
                                 # Reseta rate limit em caso de sucesso
                                 RateLimiter.reset_rate_limit(user_id, 'create_record')
@@ -478,6 +555,7 @@ def vehicle_access_interface():
             st.info("Nenhum registro para exibir.")
 
     show_scheduled_today(sheet_operations)
+
 
 
 
