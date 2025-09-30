@@ -2,13 +2,12 @@ from datetime import datetime, timedelta
 import pandas as pd
 import pytz
 import re
+import streamlit as st
 
-
-
+# Constantes de formato
 DATE_FORMAT = "%d/%m/%Y"
 TIME_FORMAT = "%H:%M"
 DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S"
-
 
 def get_sao_paulo_time():
     """Retorna o horário atual com o fuso horário de São Paulo (America/Sao_Paulo)."""
@@ -53,27 +52,6 @@ def validate_cpf(cpf):
     if resto != int(cpf_digits[10]): return False
     
     return True
-
-def round_to_nearest_interval(time_value, interval=1):
-    """Arredonda o horário para o intervalo mais próximo."""
-    try:
-        if pd.isna(time_value) or time_value == "":
-            return get_sao_paulo_time().strftime("%H:%M")
-        
-        time_obj = datetime.strptime(str(time_value), "%H:%M")
-        total_minutes = time_obj.hour * 60 + time_obj.minute
-        rounded_minutes = (total_minutes // interval) * interval
-        hours, minutes = divmod(rounded_minutes, 60)
-        return f"{hours:02d}:{minutes:02d}"
-    except (ValueError, TypeError):
-        return get_sao_paulo_time().strftime("%H:%M")
-
-def clear_access_cache():
-    """Limpa o cache de dados de acesso de forma centralizada."""
-    import streamlit as st
-    if 'df_acesso_veiculos' in st.session_state:
-        del st.session_state['df_acesso_veiculos']
-    st.cache_data.clear()
 
 def validate_placa(placa):
     """
@@ -132,5 +110,26 @@ def get_placa_tipo(placa):
         return "Antiga"
     else:
         return "Inválida"
+
+def round_to_nearest_interval(time_value, interval=1):
+    """Arredonda o horário para o intervalo mais próximo."""
+    try:
+        if pd.isna(time_value) or time_value == "":
+            return get_sao_paulo_time().strftime("%H:%M")
+        
+        time_obj = datetime.strptime(str(time_value), "%H:%M")
+        total_minutes = time_obj.hour * 60 + time_obj.minute
+        rounded_minutes = (total_minutes // interval) * interval
+        hours, minutes = divmod(rounded_minutes, 60)
+        return f"{hours:02d}:{minutes:02d}"
+    except (ValueError, TypeError):
+        return get_sao_paulo_time().strftime("%H:%M")
+
+def clear_access_cache():
+    """Limpa o cache de dados de acesso de forma centralizada."""
+    if 'df_acesso_veiculos' in st.session_state:
+        del st.session_state['df_acesso_veiculos']
+    st.cache_data.clear()
+
 
 
