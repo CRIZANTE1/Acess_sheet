@@ -9,16 +9,32 @@ from app.ui_interface import vehicle_access_interface
 from app.admin_page import admin_page
 from app.summary_page import summary_page 
 from app.scheduling_page import scheduling_page
+from app.security import SessionSecurity
 
 st.set_page_config(page_title="Controle de Acesso BAERI", layout="wide")
 
 def main():
+    # Inicializa segurança de sessão
+    SessionSecurity.init_session_security()
+    
     # Carrega os dados se ainda não estiverem na sessão
     if 'df_acesso_veiculos' not in st.session_state:
         load_data_from_sheets()
 
     if is_user_logged_in():
         
+        # Verifica timeout de sessão por inatividade
+        is_expired, minutes = SessionSecurity.check_session_timeout(timeout_minutes=30)
+        if is_expired:
+            st.warning(f"⚠️ Sua sessão expirou após {int(minutes)} minutos de inatividade. Por favor, faça login novamente.")
+            log_action("SESSION_TIMEOUT", f"Sessão expirou por inatividade ({int(minutes)} minutos)")
+            
+            keys_to_clear = ['login_time', 'login_logged', 'last_activity']
+            for key in keys_to_clear:
+                if key in st.session_state:
+                    del st.session_state[key]
+            st.logout()
+            st.rerun()
         
         if 'login_time' not in st.session_state:
             st.session_state.login_time = get_sao_paulo_time()
@@ -81,4 +97,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
