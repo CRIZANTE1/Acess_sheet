@@ -2,6 +2,12 @@ from datetime import datetime, timedelta
 import pandas as pd
 import pytz
 
+
+DATE_FORMAT = "%d/%m/%Y"
+TIME_FORMAT = "%H:%M"
+DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S"
+
+
 def get_sao_paulo_time():
     """Retorna o horário atual com o fuso horário de São Paulo (America/Sao_Paulo)."""
     utc_now = datetime.now(pytz.utc)
@@ -59,3 +65,11 @@ def round_to_nearest_interval(time_value, interval=1):
         return f"{hours:02d}:{minutes:02d}"
     except (ValueError, TypeError):
         return get_sao_paulo_time().strftime("%H:%M")
+
+def clear_access_cache():
+    """Limpa o cache de dados de acesso de forma centralizada."""
+    import streamlit as st
+    if 'df_acesso_veiculos' in st.session_state:
+        del st.session_state['df_acesso_veiculos']
+    st.cache_data.clear()
+
