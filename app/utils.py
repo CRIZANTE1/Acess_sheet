@@ -1,6 +1,8 @@
 from datetime import datetime, timedelta
 import pandas as pd
 import pytz
+import re
+
 
 
 DATE_FORMAT = "%d/%m/%Y"
@@ -72,4 +74,63 @@ def clear_access_cache():
     if 'df_acesso_veiculos' in st.session_state:
         del st.session_state['df_acesso_veiculos']
     st.cache_data.clear()
+
+def validate_placa(placa):
+    """
+    Valida placas de veículos brasileiras.
+    Aceita formato Mercosul (ABC1D23) e antigo (ABC-1234 ou ABC1234).
+    Retorna True se válida ou vazia (placa é opcional).
+    """
+    if not placa or placa.strip() == "":
+        return True  # Placa é opcional
+    
+    placa_limpa = placa.upper().replace("-", "").replace(" ", "")
+    
+    # Formato Mercosul: ABC1D23 (3 letras + 1 número + 1 letra + 2 números)
+    mercosul = re.match(r'^[A-Z]{3}[0-9][A-Z][0-9]{2}$', placa_limpa)
+    
+    # Formato antigo: ABC1234 (3 letras + 4 números)
+    antigo = re.match(r'^[A-Z]{3}[0-9]{4}$', placa_limpa)
+    
+    return bool(mercosul or antigo)
+
+def format_placa(placa):
+    """
+    Formata a placa no padrão adequado.
+    Mercosul: ABC1D23
+    Antigo: ABC-1234
+    """
+    if not placa or placa.strip() == "":
+        return ""
+    
+    placa_limpa = placa.upper().replace("-", "").replace(" ", "")
+    
+    # Verifica se é Mercosul: ABC1D23
+    if re.match(r'^[A-Z]{3}[0-9][A-Z][0-9]{2}$', placa_limpa):
+        return placa_limpa  # Mercosul não usa hífen
+    
+    # Verifica se é formato antigo: ABC1234
+    if re.match(r'^[A-Z]{3}[0-9]{4}$', placa_limpa):
+        return f"{placa_limpa[:3]}-{placa_limpa[3:]}"  # Adiciona hífen
+    
+    # Se não for nenhum formato válido, retorna como está
+    return placa.upper()
+
+def get_placa_tipo(placa):
+    """
+    Identifica o tipo de placa.
+    Retorna: 'Mercosul', 'Antiga' ou 'Inválida'
+    """
+    if not placa or placa.strip() == "":
+        return "Não informada"
+    
+    placa_limpa = placa.upper().replace("-", "").replace(" ", "")
+    
+    if re.match(r'^[A-Z]{3}[0-9][A-Z][0-9]{2}$', placa_limpa):
+        return "Mercosul"
+    elif re.match(r'^[A-Z]{3}[0-9]{4}$', placa_limpa):
+        return "Antiga"
+    else:
+        return "Inválida"
+
 
