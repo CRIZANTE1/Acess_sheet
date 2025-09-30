@@ -138,26 +138,43 @@ def get_person_status(name, df):
 def show_people_inside(df, sheet_operations):
     """Mostra uma lista de pessoas atualmente dentro com um botão de saída rápida."""
     st.subheader("Pessoas na Unidade")
-    inside_df = df[(df["Status da Entrada"] == "Autorizado") & (pd.isna(df["Horário de Saída"]) | (df["Horário de Saída"] == ""))].copy().sort_values("Nome")
+    
+    # Filtra pessoas com status Autorizado e sem horário de saída
+    inside_df = df[
+        (df["Status da Entrada"] == "Autorizado") & 
+        ((df["Horário de Saída"] == "") | pd.isna(df["Horário de Saída"]))
+    ].copy().sort_values("Nome")
+    
     if inside_df.empty:
         st.info("Ninguém registrado na unidade no momento.")
         return
+    
     for _, row in inside_df.iterrows():
         col1, col2, col3 = st.columns([2, 2, 1])
-        with col1: st.write(f"**{row['Nome']}**")
-        with col2: st.caption(f"Entrada: {row['Data']} às {row['Horário de Entrada']}")
+        with col1: 
+            st.write(f"**{row['Nome']}**")
+        with col2: 
+            st.caption(f"Entrada: {row['Data']} às {row['Horário de Entrada']}")
         with col3:
             if st.button("Sair", key=f"exit_{row.get('ID')}", use_container_width=True, disabled=st.session_state.get('processing', False)):
                 st.session_state.processing = True
                 now = get_sao_paulo_time()
-                success, message = update_exit_time(row['Nome'], now.strftime("%d/%m/%Y"), now.strftime("%H:%M"))
+                
+                success, message = update_exit_time(
+                    row['Nome'], 
+                    now.strftime("%d/%m/%Y"), 
+                    now.strftime("%H:%M")
+                )
+                
                 if success:
                     log_action("REGISTER_EXIT", f"Registrou saída para '{row['Nome']}'.")
-                    st.success(f"Saída de {row['Nome']} registrada!")
+                    st.success(f"✅ Saída de {row['Nome']} registrada!")
                     clear_access_cache()
-                else: st.error(message)
-                st.session_state.processing = False
-                st.rerun()
+                    st.session_state.processing = False
+                    st.rerun()
+                else: 
+                    st.error(f"❌ {message}")
+                    st.session_state.processing = False
 
 
 def vehicle_access_interface():
@@ -517,6 +534,7 @@ def vehicle_access_interface():
             st.info("Nenhum registro para exibir.")
 
     show_scheduled_today(sheet_operations)
+
 
 
 
