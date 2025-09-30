@@ -14,6 +14,7 @@ from app.data_operations import (
     remove_user 
 )
 from app.logger import log_action
+from app.utils import clear_access_cache
 
 def display_user_management(sheet_ops):
     """Lida com a lógica da aba de Gerenciamento de Usuários."""
@@ -32,7 +33,7 @@ def display_user_management(sheet_ops):
             else:
                 if add_user(new_user_name.strip(), new_user_role):
                     st.success(f"Usuário '{new_user_name.strip()}' adicionado com sucesso!")
-                    st.cache_data.clear() # Limpa o cache para recarregar a lista de usuários
+                    clear_access_cache()
                     st.rerun()
 
     st.divider()
@@ -64,7 +65,7 @@ def display_user_management(sheet_ops):
                     
                     st.success(f"{success_count} de {len(users_to_remove)} usuário(s) removido(s) com sucesso!")
                     if success_count > 0:
-                        st.cache_data.clear()
+                        clear_access_cache()
                         st.rerun()
 
 
@@ -136,23 +137,20 @@ def display_pending_requests(sheet_ops):
                                 if block_id_to_remove:
                                     if remove_from_blocklist([block_id_to_remove]):
                                         st.success(f"Bloqueio permanente para '{person_name}' removido com sucesso!")
-                                        # Limpa o cache da blocklist para garantir que a UI seja atualizada
-                                        st.cache_data.clear()
+                                        clear_access_cache()
                                     else:
                                         st.error(f"A entrada foi aprovada, mas FALHA ao remover o bloqueio permanente. Remova manualmente na aba 'Gerenciar Bloqueios'.")
                                 else:
                                     st.warning(f"A entrada foi aprovada, mas não foi encontrado um bloqueio permanente correspondente para '{person_name}' para remover.")
 
-                            if 'df_acesso_veiculos' in st.session_state:
-                                del st.session_state.df_acesso_veiculos
+                            clear_access_cache()
                             st.rerun()
 
                 with action_col2:
                     if st.button("❌ Negar Solicitação", key=f"deny_{record_id}", use_container_width=True):
                         if delete_record_by_id(record_id):
                             log_action("DENY_ACCESS", f"Negou a entrada de '{person_name}' (Sol: {requester}). Status anterior: {current_status}")
-                            if 'df_acesso_veiculos' in st.session_state:
-                                del st.session_state.df_acesso_veiculos
+                            clear_access_cache()
                             st.rerun()
                             
 def display_blocklist_management(sheet_ops):
@@ -186,7 +184,7 @@ def display_blocklist_management(sheet_ops):
                 admin_name = get_user_display_name()
                 if add_to_blocklist(block_type, values_to_block, reason, admin_name):
                     st.success(f"{block_type}(s) bloqueada(s) com sucesso!")
-                    st.cache_data.clear()
+                    clear_access_cache()
                     st.rerun()
     st.divider()
 
@@ -220,7 +218,7 @@ def display_blocklist_management(sheet_ops):
                 
                 if success:
                     st.success("Bloqueios removidos com sucesso! A lista será atualizada.")
-                    st.cache_data.clear()
+                    clear_access_cache()
                 
                 st.session_state.processing_blocklist = False 
                 st.rerun()
@@ -268,11 +266,11 @@ def admin_page():
         st.subheader("Status do Sistema")
         st.json({
             "sistema": "Controle de Acesso de Pessoas e Veículos",
-            "versão": "2.7.0", 
+            "versão": "2.8.0", 
             "modo_login": "OIDC (OpenID Connect) com níveis via Google Sheets",
             "status": "Operacional",
             "Developer": "Cristian Ferreira Carlos",
             "Data": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         })
-
     
+
