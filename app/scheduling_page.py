@@ -23,17 +23,32 @@ def scheduling_page():
             scheduled_date = st.date_input("Data da Visita:", value=today, min_value=today)
         with col2:
             scheduled_time = st.time_input("Hora Estimada da Chegada:")
-
+    
+        # Aprovador com confirmação
+        st.markdown("### 👤 Autorização da Visita")
         authorizer = get_user_display_name()
-        st.text_input("Autorizado Por:", value=authorizer, disabled=True)
-
-        submit_button = st.form_submit_button("Agendar Visita")
-
+        st.text_input("Você (Responsável pelo Agendamento):", value=authorizer, disabled=True)
+        
+        confirmacao_agendamento = st.checkbox(
+            "✓ Confirmo que estou ciente e autorizo este agendamento",
+            help="Você está assumindo a responsabilidade por este agendamento"
+        )
+        
+        if not confirmacao_agendamento:
+            st.warning("⚠️ **Você deve confirmar a ciência do agendamento.**")
+    
+        submit_button = st.form_submit_button(
+            "Agendar Visita",
+            disabled=not confirmacao_agendamento
+        )
+    
     if submit_button:
         if not all([visitor_name, visitor_cpf, company, scheduled_date, scheduled_time]):
             st.error("Por favor, preencha todos os campos.")
         elif not validate_cpf(visitor_cpf):
             st.error("O CPF informado é inválido.")
+        elif not confirmacao_agendamento:
+            st.error("❌ Você deve confirmar que está ciente do agendamento.")
         else:
             formatted_cpf = format_cpf(visitor_cpf)
             date_str = scheduled_date.strftime("%d/%m/%Y")
@@ -52,8 +67,8 @@ def scheduling_page():
             ]
             
             if sheet_ops.adc_dados_aba(new_schedule_data, 'schedules'):
-                st.success(f"Visita para '{visitor_name.strip()}' agendada com sucesso para {date_str} às {time_str}!")
-                log_action("CREATE_SCHEDULE", f"Agendou visita para '{visitor_name.strip()}' em {date_str}.")
+                st.success(f"✅ Visita para '{visitor_name.strip()}' agendada com sucesso para {date_str} às {time_str}!")
+                log_action("CREATE_SCHEDULE", f"Agendou visita para '{visitor_name.strip()}' em {date_str}. Confirmado ciente.")
             else:
                 st.error("Ocorreu um erro ao salvar o agendamento. Tente novamente.")
 
