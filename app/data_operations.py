@@ -307,7 +307,42 @@ def add_to_blocklist(block_type, values, reason, admin_name):
         st.error(f"Erro ao adicionar à blocklist: {e}")
         return False
 
+def editar_dados_aba(self, row_id, updated_data, aba_name):
+    """Edita uma linha em uma aba específica com base no ID."""
+    if not self.credentials or not self.my_archive_google_sheets:
+        return False
+    try:
+        archive = self.credentials.open_by_url(self.my_archive_google_sheets)
+        aba = archive.worksheet_by_title(aba_name)
+        
+        all_values = aba.get_all_values()
+        row_to_update_index = -1
+        
+        # Itera sobre as linhas para encontrar o ID
+        for i, row in enumerate(all_values):
+            # Compara o valor da primeira coluna (ID)
+            if row and str(row[0]) == str(row_id):
+                row_to_update_index = i + 1
+                break
+        
+        if row_to_update_index != -1:
+            updated_row = [str(row_id)] + updated_data
+            aba.update_row(row_to_update_index, updated_row)
+            logging.info(f"Dados do ID {row_id} editados com sucesso na aba '{aba_name}'.")
+            return True
+        else:
+            logging.error(f"ID {row_id} não encontrado na aba '{aba_name}' para edição.")
+            return False
+            
+    except Exception as e:
+        logging.error(f"Erro ao editar dados na aba '{aba_name}': {e}", exc_info=True)
+        st.error(f"Erro crítico ao tentar editar dados: {e}")
+        return False
 
+def editar_dados(self, id, updated_data):
+    """Função de conveniência para editar dados na aba 'acess'."""
+    return self.editar_dados_aba(id, updated_data, 'acess')
+    
 def remove_from_blocklist(block_ids):
     """Remove uma ou mais entradas da blocklist pelo ID."""
     try:
@@ -461,6 +496,7 @@ def check_briefing_needed(person_name, df):
     except Exception as e:
         print(f"Erro em check_briefing_needed: {e}")
         return False, "Erro ao verificar briefing"
+
 
 
 
