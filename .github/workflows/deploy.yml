@@ -32,12 +32,12 @@ jobs:
         uses: streamlit/streamlit-deploy-action@v0.0.9
         with:
           secrets: |
-            # Credenciais para o envio de e-mail
             [email]
             gmail_user = "${{ secrets.GMAIL_USER }}"
             gmail_app_password = "${{ secrets.GMAIL_APP_PASSWORD }}"
             system_url = "${{ secrets.SYSTEM_URL }}"
             admin_emails = "${{ secrets.ADMIN_EMAILS }}"
+            from_name = "Sistema BAERI"
 
             # Credenciais para acessar o Google Sheets
             [connections.gsheets]
