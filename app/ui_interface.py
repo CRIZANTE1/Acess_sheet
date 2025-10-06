@@ -483,7 +483,6 @@ def vehicle_access_interface():
                     type="primary", 
                     disabled=button_disabled
                 ):
-                    
                     # Verifica rate limit
                     user_id = get_user_display_name()
                     is_allowed, remaining, reset_time = RateLimiter.check_rate_limit(
@@ -506,34 +505,45 @@ def vehicle_access_interface():
                         st.error("❌ Placa inválida! Corrija antes de continuar.")
                         st.info("Formatos aceitos: ABC-1234 (antiga) ou ABC1D23 (Mercosul)")
                     else:
+                        # >>> ADICIONE ESTA VERIFICAÇÃO AQUI <
                         is_blocked, reason = is_entity_blocked(selected_name, result_empresa)
                         if is_blocked:
-                            log_action("BLOCKED_ACCESS_ATTEMPT", f"Tentativa de '{selected_name}' interceptada.")
-                            request_blocklist_override_dialog(selected_name, result_empresa)
-                        else:
-                            st.session_state.processing = True
-                            now = get_sao_paulo_time()
-                            placa_formatada = format_placa(placa) if placa else ""
+                            st.error(f"🚫 **ACESSO BLOQUEADO**")
+                            st.warning(f"**Motivo do bloqueio:** {reason}")
+                            st.info("Esta pessoa/empresa está na lista de bloqueios permanentes.")
+                            log_action("BLOCKED_ACCESS_ATTEMPT", f"Tentativa de '{selected_name}' da empresa '{result_empresa}' interceptada. Motivo: {reason}")
+                            SessionSecurity.record_failed_attempt(user_id, f"Blocked entity: {selected_name}")
                             
-                            if add_record(
-                                name=selected_name, 
-                                cpf=str(latest_record.get("CPF", "")),
-                                placa=placa_formatada, 
-                                marca_carro=str(latest_record.get("Marca do Carro", "")),
-                                horario_entrada=now.strftime("%H:%M"), 
-                                data=now.strftime("%d/%m/%Y"), 
-                                empresa=result_empresa, 
-                                status="Autorizado", 
-                                motivo="", 
-                                aprovador=aprovador, 
-                                first_reg_date=""
-                            ):
-                                log_action("REGISTER_ENTRY", f"Registrou nova entrada para '{selected_name}'. Placa: {placa_formatada}. Aprovador: {aprovador} (confirmado ciente)")
-                                st.success(f"✅ Nova entrada de {selected_name} registrada e autorizada por {aprovador}!")
-                                clear_access_cache()
-                            
-                            st.session_state.processing = False
-                            st.rerun()
+                            # Oferece opção de solicitar liberação excepcional
+                            if st.button("⚠️ Solicitar Liberação Excepcional", key="req_override_fora", use_container_width=True):
+                                request_blocklist_override_dialog(selected_name, result_empresa)
+                            st.stop()  # Impede continuar o registro
+                        # >>> FIM DA ADIÇÃO <
+                        
+                        # Resto do código continua normal...
+                        st.session_state.processing = True
+                        now = get_sao_paulo_time()
+                        placa_formatada = format_placa(placa) if placa else ""
+                        
+                        if add_record(
+                            name=selected_name, 
+                            cpf=str(latest_record.get("CPF", "")),
+                            placa=placa_formatada, 
+                            marca_carro=str(latest_record.get("Marca do Carro", "")),
+                            horario_entrada=now.strftime("%H:%M"), 
+                            data=now.strftime("%d/%m/%Y"), 
+                            empresa=result_empresa, 
+                            status="Autorizado", 
+                            motivo="", 
+                            aprovador=aprovador, 
+                            first_reg_date=""
+                        ):
+                            log_action("REGISTER_ENTRY", f"Registrou nova entrada para '{selected_name}'. Placa: {placa_formatada}. Aprovador: {aprovador} (confirmado ciente)")
+                            st.success(f"✅ Nova entrada de {selected_name} registrada e autorizada por {aprovador}!")
+                            clear_access_cache()
+                        
+                        st.session_state.processing = False
+                        st.rerun()
         
         elif status == "Novo":
             st.info("Pessoa não encontrada. Preencha o formulário.")
@@ -611,39 +621,50 @@ def vehicle_access_interface():
                     elif not aprovador_ciente:
                         st.error("❌ Você deve confirmar que o aprovador está ciente desta entrada.")
                     else:
-                        # Verifica blocklist
+                        # >>> VERIFICAÇÃO DE BLOCKLIST MELHORADA <
                         is_blocked, reason = is_entity_blocked(clean_data['name'], clean_data['empresa'])
                         if is_blocked:
-                            log_action("BLOCKED_ACCESS_ATTEMPT", f"Tentativa de '{clean_data['name']}' interceptada.")
+                            st.error(f"🚫 **ACESSO BLOQUEADO**")
+                            st.warning(f"**Motivo do bloqueio:** {reason}")
+                            st.info("Esta pessoa/empresa está na lista de bloqueios permanentes e não pode ser cadastrada.")
+                            log_action("BLOCKED_ACCESS_ATTEMPT", f"Tentativa de cadastro de '{clean_data['name']}' da empresa '{clean_data['empresa']}' interceptada. Motivo: {reason}")
                             SessionSecurity.record_failed_attempt(user_id, f"Blocked entity: {clean_data['name']}")
-                            request_blocklist_override_dialog(clean_data['name'], clean_data['empresa'])
-                        else:
-                            st.session_state.processing = True
-                            now = get_sao_paulo_time()
                             
-                            if add_record(
-                                name=clean_data['name'], 
-                                cpf=clean_data['cpf'], 
-                                placa=clean_data['placa'], 
-                                marca_carro=marca_carro.strip() if marca_carro else "", 
-                                horario_entrada=now.strftime("%H:%M"), 
-                                data=now.strftime("%d/%m/%Y"), 
-                                empresa=clean_data['empresa'], 
-                                status="Autorizado", 
-                                motivo="", 
-                                aprovador=aprovador, 
-                                first_reg_date=now.strftime("%d/%m/%Y")
-                            ):
-                                log_action("CREATE_RECORD", f"Cadastrou novo visitante: '{clean_data['name']}'. Aprovador: {aprovador} (confirmado ciente)")
-                                st.success(f"✅ Novo registro para {clean_data['name']} criado com sucesso e autorizado por {aprovador}!")
-                                
-                                # Reseta rate limit em caso de sucesso
-                                RateLimiter.reset_rate_limit(user_id, 'create_record')
-                                
-                                clear_access_cache()
+                            # Oferece opção de solicitar liberação excepcional
+                            st.divider()
+                            st.write("**Para permitir o acesso desta pessoa/empresa, você precisa solicitar uma liberação excepcional.**")
+                            if st.button("⚠️ Solicitar Liberação Excepcional ao Administrador", key="req_override_novo", use_container_width=True, type="secondary"):
+                                request_blocklist_override_dialog(clean_data['name'], clean_data['empresa'])
+                            st.stop()  # Impede continuar o cadastro
+                        # >>> FIM DA MELHORIA <
+                        
+                        # Se não estiver bloqueado, continua normal
+                        st.session_state.processing = True
+                        now = get_sao_paulo_time()
+                        
+                        if add_record(
+                            name=clean_data['name'], 
+                            cpf=clean_data['cpf'], 
+                            placa=clean_data['placa'], 
+                            marca_carro=marca_carro.strip() if marca_carro else "", 
+                            horario_entrada=now.strftime("%H:%M"), 
+                            data=now.strftime("%d/%m/%Y"), 
+                            empresa=clean_data['empresa'], 
+                            status="Autorizado", 
+                            motivo="", 
+                            aprovador=aprovador, 
+                            first_reg_date=now.strftime("%d/%m/%Y")
+                        ):
+                            log_action("CREATE_RECORD", f"Cadastrou novo visitante: '{clean_data['name']}'. Aprovador: {aprovador} (confirmado ciente)")
+                            st.success(f"✅ Novo registro para {clean_data['name']} criado com sucesso e autorizado por {aprovador}!")
                             
-                            st.session_state.processing = False
-                            st.rerun()
+                            # Reseta rate limit em caso de sucesso
+                            RateLimiter.reset_rate_limit(user_id, 'create_record')
+                            
+                            clear_access_cache()
+                        
+                        st.session_state.processing = False
+                        st.rerun()
 
     with col_sidebar:
         if not df.empty: 

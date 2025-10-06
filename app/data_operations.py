@@ -3,7 +3,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 from app.operations import SheetOperations
 from app.logger import log_action
-from app.utils import get_sao_paulo_time
+from app.utils import get_sao_paulo_time, validate_cpf
 
 
 def load_data_from_sheets():
@@ -186,19 +186,45 @@ def update_record_status(record_id, new_status, approver_name):
             cpf_index = header.index("CPF")
             current_cpf = record_to_update.iloc[0].get('CPF', '')
             
-            if not current_cpf or str(current_cpf).strip() == '':
+            # Só busca CPF anterior se o atual estiver vazio ou inválido
+            if not current_cpf or str(current_cpf).strip() == '' or not validate_cpf(current_cpf):
                 person_name = record_to_update.iloc[0]['Nome']
                 
-                previous_records_with_cpf = df[
-                    (df['Nome'] == person_name) & 
-                    (df['CPF'].notna()) & 
-                    (df['CPF'] != '')
-                ]
+                # >>> BUSCA MELHORADA COM VALIDAÇÃO <
+                # Converte coluna Data para datetime para ordenar corretamente
+                df_copy = df.copy()
+                df_copy['Data_dt'] = pd.to_datetime(df_copy['Data'], format='%d/%m/%Y', errors='coerce')
+                
+                # Busca registros com CPF válido, ordenados do mais recente para o mais antigo
+                previous_records_with_cpf = df_copy[
+                    (df_copy['Nome'] == person_name) & 
+                    (df_copy['CPF'].notna()) & 
+                    (df_copy['CPF'] != '') &
+                    (df_copy['CPF'].astype(str).str.match(r'^\d{3}\.\d{3}\.\d{3}-\d{2}$', na=False))  # Valida formato
+                ].sort_values('Data_dt', ascending=False)  # Mais recente primeiro
                 
                 if not previous_records_with_cpf.empty:
+                    # Pega o CPF do registro mais recente
                     last_valid_cpf = previous_records_with_cpf.iloc[0]['CPF']
-                    updated_data[cpf_index - 1] = last_valid_cpf
-                    log_action("ENRICH_DATA", f"CPF '{last_valid_cpf}' adicionado ao registro {record_id} para '{person_name}' durante a aprovação.")
+                    
+                    # Valida o CPF antes de usar
+                    if validate_cpf(last_valid_cpf):
+                        updated_data[cpf_index - 1] = last_valid_cpf
+                        log_action(
+                            "ENRICH_DATA", 
+                            f"CPF '{last_valid_cpf}' (do registro mais recente) adicionado ao registro {record_id} para '{person_name}' durante a aprovação."
+                        )
+                    else:
+                        log_action(
+                            "CPF_VALIDATION_FAILED",
+                            f"CPF anterior encontrado para '{person_name}' é inválido: '{last_valid_cpf}'. Não foi copiado."
+                        )
+                else:
+                    log_action(
+                        "MISSING_CPF",
+                        f"Nenhum CPF válido anterior encontrado para '{person_name}' ao aprovar registro {record_id}."
+                    )
+                # >>> FIM DA MELHORIA <
 
         if sheet_operations.editar_dados(record_id, updated_data):
             st.success("Status do registro atualizado com sucesso!")

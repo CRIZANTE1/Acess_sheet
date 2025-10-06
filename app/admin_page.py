@@ -448,6 +448,65 @@ def display_testing_page():
             else:
                 st.error("Por favor, insira um endereço de e-mail válido.")
 
+    # --- DIAGNÓSTICO DE DEPURAÇÃO ---
+    with st.container(border=True):
+        st.subheader("🔍 Diagnóstico de Notificações")
+        
+        if st.button("Testar Função de Desbloqueio Diretamente"):
+            st.write("Iniciando teste...")
+            
+            try:
+                from app.notifications import GmailNotifier, NotificationTemplates, get_admin_emails, get_system_url
+                
+                st.write("✅ Imports realizados com sucesso")
+                
+                # Testa o notificador
+                notifier = GmailNotifier()
+                st.write(f"✅ Notificador criado - Habilitado: {notifier.enabled}")
+                
+                if not notifier.enabled:
+                    st.error("❌ Notificador não está habilitado!")
+                    st.stop()
+                
+                # Testa buscar emails de admins
+                admin_emails = get_admin_emails()
+                st.write(f"✅ Emails de admins encontrados: {admin_emails}")
+                
+                if not admin_emails:
+                    st.error("❌ Nenhum email de admin configurado!")
+                    st.stop()
+                
+                # Testa criar o template
+                templates = NotificationTemplates()
+                system_url = get_system_url()
+                
+                subject, html, plain = templates.blocklist_override_request(
+                    person_name="Teste Debug",
+                    company="Empresa Debug",
+                    reason="Teste de diagnóstico",
+                    requester=get_user_display_name(),
+                    system_url=system_url
+                )
+                
+                st.write("✅ Template criado com sucesso")
+                st.write(f"**Assunto:** {subject}")
+                
+                # Tenta enviar
+                st.write("Tentando enviar e-mail...")
+                results = notifier.send_bulk_email(admin_emails, subject, html, plain)
+                
+                st.write(f"**Resultado:** {results}")
+                
+                if results['success'] > 0:
+                    st.success(f"✅ {results['success']} e-mail(s) enviado(s) com sucesso!")
+                else:
+                    st.error(f"❌ Falha no envio. Emails com erro: {results['failed_emails']}")
+                    
+            except Exception as e:
+                st.error(f"❌ Erro durante o teste: {e}")
+                import traceback
+                st.code(traceback.format_exc())
+
     # --- Simulação de Notificações Padrão ---
     with st.container(border=True):
         st.subheader("2. Simular Notificações Automáticas")
