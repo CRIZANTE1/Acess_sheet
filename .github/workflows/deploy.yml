@@ -1,52 +1,45 @@
-
+# Nome do workflow
 name: Deploy Streamlit App
 
-# Define o gatilho: este workflow rodará sempre que houver um 'push' para a branch 'main'
+# Gatilho
 on:
   push:
     branches:
       - main
 
-# Define os "trabalhos" (jobs) que serão executados
+# Jobs
 jobs:
   deploy:
-    # Usa a versão mais recente do Ubuntu como ambiente de execução
     runs-on: ubuntu-latest
-
-    # Define os passos (etapas) do job
     steps:
-      # 1. Baixa o código do seu repositório para o ambiente de execução
+      # 1. Baixa o código
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # 2. Configura o ambiente Python
+      # 2. Configura o Python
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.9' # Use a versão do Python do seu projeto
+          python-version: '3.9'
 
-      # 3. Instala todas as bibliotecas listadas no seu requirements.txt
+      # 3. Instala as dependências
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      # 4. Faz o deploy para o Streamlit Cloud usando uma Action pronta
+      # 4. Faz o deploy
       - name: Deploy to Streamlit Cloud
+        # ESTA É A LINHA QUE PRECISA SER CORRIGIDA
         uses: streamlit/streamlit-deploy-action@v0.0.9
         with:
-          # A MÁGICA ACONTECE AQUI:
-          # Este bloco cria dinamicamente o arquivo secrets.toml para a sua aplicação
-          # usando os segredos que você configurou no repositório do GitHub.
           secrets: |
-            # <<< Credenciais para o envio de e-mail >>>
+            # Credenciais para o envio de e-mail
             [email]
             gmail_user = "${{ secrets.GMAIL_USER }}"
             gmail_app_password = "${{ secrets.GMAIL_APP_PASSWORD }}"
             system_url = "${{ secrets.SYSTEM_URL }}"
             admin_emails = "${{ secrets.ADMIN_EMAILS }}"
 
-            # <<< Credenciais para acessar o Google Sheets >>>
-            # O nome do segredo aqui (GCP_SERVICE_ACCOUNT_CREDENTIALS) deve ser EXATAMENTE
-            # o mesmo nome que você usou nas configurações do repositório no GitHub.
+            # Credenciais para acessar o Google Sheets
             [connections.gsheets]
             spreadsheet = "https://docs.google.com/spreadsheets/d/${{ secrets.SPREADSHEET_ID }}"
             ${{ secrets.GCP_SERVICE_ACCOUNT_CREDENTIALS }}
