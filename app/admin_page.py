@@ -18,6 +18,8 @@ from app.data_operations import (
 )
 from app.logger import log_action
 from app.utils import clear_access_cache
+# NOVAS IMPORTAÇÕES PARA A PÁGINA DE TESTES
+from app.notifications import GmailNotifier, send_notification
 
 def display_user_management(sheet_ops):
     """Lida com a lógica da aba de Gerenciamento de Usuários."""
@@ -144,32 +146,23 @@ def display_access_requests(sheet_ops):
                         ):
                             admin_name = get_user_display_name()
                             
-                            # Atualiza o status da solicitação
                             if update_access_request_status(
                                 request_id, 
                                 "Aprovado", 
                                 admin_name
                             ):
-                                # Adiciona o usuário ao sistema
                                 if add_user(request['user_email'], request['desired_role']):
                                     log_action(
                                         "APPROVE_ACCESS_REQUEST",
                                         f"Aprovou solicitação de '{request['user_email']}' para '{request['desired_role']}'"
                                     )
-                                    
-                                    # NOVO: Envia email de aprovação
-                                    try:
-                                        from app.notifications import send_notification
-                                        import logging
-                                        send_notification(
-                                            "access_approved",
-                                            to_email=request['user_email'],
-                                            user_name=request['user_name'],
-                                            role=request['desired_role']
-                                        )
-                                    except Exception as e:
-                                        logging.error(f"Erro ao enviar email de aprovação: {e}")
-                                    
+                                    # Envia email de aprovação
+                                    send_notification(
+                                        "access_approved",
+                                        to_email=request['user_email'],
+                                        user_name=request['user_name'],
+                                        role=request['desired_role']
+                                    )
                                     st.success(f"✅ Acesso aprovado para {request['user_name']}!")
                                     clear_access_cache()
                                     st.rerun()
@@ -195,20 +188,13 @@ def display_access_requests(sheet_ops):
                                     "REJECT_ACCESS_REQUEST",
                                     f"Rejeitou solicitação de '{request['user_email']}'"
                                 )
-                                
-                                # NOVO: Envia email de rejeição
-                                try:
-                                    from app.notifications import send_notification
-                                    import logging
-                                    send_notification(
-                                        "access_rejected",
-                                        to_email=request['user_email'],
-                                        user_name=request['user_name'],
-                                        reason="Sua solicitação foi analisada e não foi aprovada neste momento."
-                                    )
-                                except Exception as e:
-                                    logging.error(f"Erro ao enviar email de rejeição: {e}")
-                                
+                                # Envia email de rejeição
+                                send_notification(
+                                    "access_rejected",
+                                    to_email=request['user_email'],
+                                    user_name=request['user_name'],
+                                    reason="Sua solicitação foi analisada e não foi aprovada neste momento."
+                                )
                                 st.info(f"Solicitação de {request['user_name']} foi rejeitada.")
                                 st.rerun()
     
@@ -241,7 +227,7 @@ def display_access_requests(sheet_ops):
 def display_pending_requests(sheet_ops):
     """Lida com a lógica da aba de Aprovações Pendentes."""
     st.header("Aprovação de Acessos Pendentes")
-    all_data = sheet_ops.carregar_dados()  # Carrega dados de 'acess'
+    all_data = sheet_ops.carregar_dados()
     
     if not all_data or len(all_data) < 2:
         st.info("Não há dados de acesso para analisar ou a planilha está vazia.")
@@ -257,13 +243,12 @@ def display_pending_requests(sheet_ops):
     else:
         st.warning(f"Você tem {len(pending_requests)} solicitação(ões) de acesso para analisar.")
         
-        # Prioriza as solicitações da blocklist, mostrando-as primeiro
         pending_requests = pending_requests.sort_values(by='Status da Entrada', ascending=False)
 
         for _, row in pending_requests.iterrows():
             record_id = row['ID']
             person_name = row['Nome']
-            empresa_name = row.get('Empresa', '') # Pega o nome da empresa para a busca na blocklist
+            empresa_name = row.get('Empresa', '')
             request_date = row['Data']
             requester = row['Aprovador']
             reason = row.get('Motivo do Bloqueio', 'Motivo não especificado.')
@@ -296,7 +281,6 @@ def display_pending_requests(sheet_ops):
                                 st.info(f"Processando remoção de bloqueio permanente para '{person_name}'...")
                                 blocklist_df = get_blocklist()
                                 
-                                # Tenta encontrar o ID do bloqueio pelo nome da pessoa
                                 person_block = blocklist_df[(blocklist_df['Type'] == 'Pessoa') & (blocklist_df['Value'] == person_name)]
                                 
                                 block_id_to_remove = None
@@ -350,7 +334,6 @@ def display_blocklist_management(sheet_ops):
             elif not reason.strip():
                 st.error("O motivo do bloqueio é obrigatório.")
             else:
-                # Valida o motivo
                 clean_reason, errors = SecurityValidator.sanitize_input(reason, "Motivo")
                 
                 if errors:
@@ -413,6 +396,85 @@ def display_logs(sheet_ops):
     except Exception as e:
         st.warning(f"Não foi possível carregar os logs: {e}")
 
+# NOVA FUNÇÃO PARA A PÁGINA DE TESTES
+def display_testing_page():
+    """Lida com a lógica da aba de Testes para administradores."""
+    st.header("Página de Testes e Diagnósticos")
+    st.warning("Esta página é para administradores testarem funcionalidades do sistema. As ações aqui podem enviar notificações reais.")
+
+    # --- Teste de Conexão e Envio Direto de Email ---
+    with st.container(border=True):
+        st.subheader("1. Testar Envio Direto de E-mail")
+        st.markdown("""
+        Use esta função para verificar se as credenciais de e-mail (Gmail SMTP) estão configuradas corretamente e se o sistema consegue enviar e-mails.
+        """)
+        
+        default_email = get_user_email()
+        recipient_email = st.text_input("Enviar e-mail de teste para:", value=default_email)
+        
+        if st.button("Enviar E-mail de Teste", type="primary"):
+            if recipient_email and "@" in recipient_email:
+                notifier = GmailNotifier()
+                if not notifier.enabled:
+                    st.error("O sistema de notificações por e-mail não está habilitado. Verifique as configurações.")
+                else:
+                    subject = "✅ E-mail de Teste do Sistema BAERI"
+                    html_content = """
+                    <h1>Olá!</h1>
+                    <p>Este é um e-mail de teste enviado a partir do painel administrativo do Sistema BAERI.</p>
+                    <p>Se você recebeu esta mensagem, a configuração SMTP do Gmail está funcionando corretamente. 🎉</p>
+                    """
+                    plain_content = "Olá! Este é um e-mail de teste do Sistema BAERI. A configuração está funcionando."
+                    
+                    st.info(f"Tentando enviar e-mail para {recipient_email}...")
+                    if notifier.send_email(recipient_email, subject, html_content, plain_content):
+                        st.success(f"E-mail de teste enviado com sucesso para {recipient_email}!")
+                        log_action("TEST_EMAIL_SENT", f"E-mail de teste enviado para {recipient_email}")
+                    else:
+                        st.error("Falha ao enviar o e-mail de teste. Verifique os logs do console e as configurações de credenciais (senha de app do Gmail).")
+            else:
+                st.error("Por favor, insira um endereço de e-mail válido.")
+
+    # --- Simulação de Notificações Padrão ---
+    with st.container(border=True):
+        st.subheader("2. Simular Notificações Automáticas")
+        st.markdown("""
+        Clique nos botões abaixo para acionar as notificações automáticas que os administradores recebem. Isso permite visualizar o template e o conteúdo dos e-mails.
+        """)
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if st.button("Simular Nova Solicitação de Acesso", use_container_width=True):
+                st.info("Simulando notificação de nova solicitação de acesso para todos os admins...")
+                success = send_notification(
+                    "new_access_request",
+                    requester_name="Fulano de Tal (Teste)",
+                    requester_email="fulano.teste@email.com",
+                    role="operacional",
+                    department="TI (Simulação)",
+                    justification="Esta é uma justificativa de teste gerada pelo painel administrativo para verificar o template do e-mail."
+                )
+                if success:
+                    st.success("Notificação de 'Nova Solicitação' enviada com sucesso para os administradores!")
+                else:
+                    st.error("Falha ao enviar a notificação de 'Nova Solicitação'.")
+
+        with col2:
+            if st.button("Simular Desbloqueio Urgente", use_container_width=True):
+                st.info("Simulando notificação de desbloqueio urgente para todos os admins...")
+                success = send_notification(
+                    "blocklist_override",
+                    person_name="Ciclano Bloqueado (Teste)",
+                    company="Empresa de Teste Ltda.",
+                    reason="Solicitação de teste para verificar a notificação de desbloqueio de alta prioridade.",
+                    requester=get_user_display_name()
+                )
+                if success:
+                    st.success("Notificação de 'Desbloqueio Urgente' enviada com sucesso para os administradores!")
+                else:
+                    st.error("Falha ao enviar a notificação de 'Desbloqueio Urgente'.")
+
 def admin_page():
     """Renderiza a página administrativa completa com abas."""
     if not is_admin():
@@ -422,16 +484,19 @@ def admin_page():
     st.title("Painel Administrativo")
     sheet_ops = SheetOperations()
     
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
-        "Solicitações de Acesso",  # NOVA ABA
+    # ADICIONADA NOVA ABA DE TESTES
+    tab_titles = [
+        "Solicitações de Acesso",
         "Aprovações Pendentes",
         "Gerenciar Bloqueios",
         "Gerenciar Usuários",
-        "Logs do Sistema"
-    ])
+        "Logs do Sistema",
+        "Página de Testes"
+    ]
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(tab_titles)
 
     with tab1:
-        display_access_requests(sheet_ops)  # NOVA FUNÇÃO
+        display_access_requests(sheet_ops)
     with tab2:
         display_pending_requests(sheet_ops)
     with tab3:
@@ -440,6 +505,9 @@ def admin_page():
         display_user_management(sheet_ops) 
     with tab5:
         display_logs(sheet_ops)
+    with tab6:
+        # CHAMA A NOVA FUNÇÃO DE TESTES
+        display_testing_page()
         
     st.divider()
     with st.expander("Status e Configurações do Sistema"):
