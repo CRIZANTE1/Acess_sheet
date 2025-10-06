@@ -27,6 +27,25 @@ class SheetOperations:
             return [row[0] for row in dados[1:] if row and row[0].strip()]
         return []
 
+    def carregar_dados_materiais(self):
+        """Carrega a lista de itens da aba 'materials' (apenas coluna Item)."""
+        dados = self.carregar_dados_aba('materials')
+        if dados and len(dados) > 1:
+            # Extrai apenas valores únicos não vazios da coluna "Item" (índice 1, pois 0 é ID)
+            header = dados[0]
+            try:
+                item_idx = header.index('Item')
+                itens = []
+                for row in dados[1:]:
+                    if len(row) > item_idx and row[item_idx] and row[item_idx].strip():
+                        item = row[item_idx].strip()
+                        if item not in itens:  # Evita duplicatas
+                            itens.append(item)
+                return sorted(itens)  # Retorna ordenado alfabeticamente
+            except (ValueError, IndexError):
+                return []
+        return []
+
     def carregar_dados_aba(self, aba_name):
         """Carrega todos os dados de uma aba específica da planilha."""
         if not self.credentials or not self.my_archive_google_sheets:
@@ -100,6 +119,8 @@ class SheetOperations:
                         "status",
                         "reviewed_by"
                     ])
+                elif aba_name == 'materials':
+                    aba.update_row(1, ["ID", "Item", "Quantidade", "Destino", "Responsável pela Saída"])
             
             all_values = aba.get_all_values()
             existing_ids = [row[0] for row in all_values[1:] if row and row[0]]
@@ -227,28 +248,3 @@ class SheetOperations:
         except Exception as e:
             logging.error(f"Erro ao excluir linha por valor: {e}", exc_info=True)
             return False
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

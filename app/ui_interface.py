@@ -156,7 +156,64 @@ def show_people_inside(df, sheet_operations):
         with col2: 
             st.caption(f"Entrada: {row['Data']} às {row['Horário de Entrada']}")
         with col3:
+            # Toggle para saída com material
+            saida_com_material = st.checkbox(
+                "Saiu com material?",
+                key=f"mat_toggle_{row.get('ID')}",
+                help="Marque se a pessoa está levando materiais"
+            )
+            
+            if saida_com_material:
+                sheet_ops = SheetOperations()
+                lista_materiais = sheet_ops.carregar_dados_materiais()
+                
+                if not lista_materiais:
+                    st.warning("Nenhum material cadastrado")
+                else:
+                    # Container para formulário de material
+                    with st.expander("📦 Dados do Material", expanded=True):
+                        material_item = st.selectbox(
+                            "Item:",
+                            options=[""] + lista_materiais,
+                            key=f"mat_item_{row.get('ID')}"
+                        )
+                        
+                        col_qtd, col_dest = st.columns(2)
+                        with col_qtd:
+                            material_qtd = st.number_input(
+                                "Quantidade:",
+                                min_value=1,
+                                value=1,
+                                key=f"mat_qtd_{row.get('ID')}"
+                            )
+                        
+                        with col_dest:
+                            material_destino = st.text_input(
+                                "Destino:",
+                                placeholder="Ex: Obra, Cliente, Matriz",
+                                key=f"mat_dest_{row.get('ID')}"
+                            )
+                        
+                        material_responsavel = st.text_input(
+                            "Responsável pela Saída:",
+                            value=row['Nome'],
+                            key=f"mat_resp_{row.get('ID')}",
+                            help="Pessoa responsável por levar o material"
+                        )
+            
             if st.button("Sair", key=f"exit_{row.get('ID')}", use_container_width=True, disabled=st.session_state.get('processing', False)):
+                # Validação se está saindo com material
+                if saida_com_material:
+                    if not material_item or material_item == "":
+                        st.error("❌ Selecione um item")
+                        st.stop()
+                    if not material_destino or material_destino.strip() == "":
+                        st.error("❌ Informe o destino do material")
+                        st.stop()
+                    if not material_responsavel or material_responsavel.strip() == "":
+                        st.error("❌ Informe o responsável pela saída")
+                        st.stop()
+                
                 st.session_state.processing = True
                 now = get_sao_paulo_time()
                 
@@ -167,8 +224,33 @@ def show_people_inside(df, sheet_operations):
                 )
                 
                 if success:
+                    # Log de saída normal
                     log_action("REGISTER_EXIT", f"Registrou saída para '{row['Nome']}'.")
-                    st.success(f"✅ Saída de {row['Nome']} registrada!")
+                    
+                    # Registra saída de material se aplicável
+                    if saida_com_material and material_item:
+                        # Adiciona registro na aba materials
+                        material_data = [
+                            material_item,
+                            str(material_qtd),
+                            material_destino.strip(),
+                            material_responsavel.strip()
+                        ]
+                        
+                        if sheet_ops.adc_dados_aba(material_data, 'materials'):
+                            # Log de auditoria
+                            log_action(
+                                "SAIDA_MATERIAL",
+                                f"{material_responsavel.strip()} levou {material_qtd}x {material_item} para {material_destino.strip()}"
+                            )
+                            
+                            st.success(f"✅ Saída de {row['Nome']} registrada!")
+                            st.info(f"📦 Material: {material_qtd}x {material_item} → {material_destino.strip()}")
+                        else:
+                            st.warning("⚠️ Saída registrada, mas houve erro ao registrar o material")
+                    else:
+                        st.success(f"✅ Saída de {row['Nome']} registrada!")
+                    
                     clear_access_cache()
                     st.session_state.processing = False
                     st.rerun()
@@ -252,12 +334,74 @@ def vehicle_access_interface():
             st.info(f"**{selected_name}** está **DENTRO** da unidade.")
             st.write(f"**Entrada em:** {latest_record['Data']} às {latest_record['Horário de Entrada']}")
             
+            # Toggle para material
+            saida_com_material = st.checkbox(
+                "Saiu com material?",
+                key=f"mat_toggle_individual_{selected_name}",
+                help="Marque se a pessoa está levando materiais"
+            )
+
+            material_item = ""
+            material_qtd = 1
+            material_destino = ""
+            material_responsavel = ""
+
+            if saida_com_material:
+                lista_materiais = sheet_operations.carregar_dados_materiais()
+                
+                if not lista_materiais:
+                    st.warning("⚠️ Nenhum material cadastrado na aba 'materials'")
+                else:
+                    with st.container(border=True):
+                        st.write("**Dados do Material para Saída**")
+                        
+                        material_item = st.selectbox(
+                            "Item:",
+                            options=[""] + lista_materiais,
+                            key=f"mat_item_individual_{selected_name}"
+                        )
+                        
+                        col_qtd, col_dest = st.columns(2)
+                        with col_qtd:
+                            material_qtd = st.number_input(
+                                "Quantidade:",
+                                min_value=1,
+                                value=1,
+                                key=f"mat_qtd_individual_{selected_name}"
+                            )
+                        
+                        with col_dest:
+                            material_destino = st.text_input(
+                                "Destino:",
+                                placeholder="Ex: Obra, Cliente, Matriz",
+                                key=f"mat_dest_individual_{selected_name}"
+                            )
+                        
+                        material_responsavel = st.text_input(
+                            "Responsável pela Saída:",
+                            value=selected_name,
+                            key=f"mat_resp_individual_{selected_name}",
+                            help="Pessoa responsável por levar o material"
+                        )
+
             if st.button(
                 f"✅ Registrar Saída de {selected_name}", 
                 use_container_width=True, 
                 type="primary", 
                 disabled=st.session_state.processing
             ):
+                # Validação
+                if saida_com_material:
+                    if not material_item or material_item == "":
+                        st.error("❌ Selecione um item")
+                        st.stop()
+                    if not material_destino or material_destino.strip() == "":
+                        st.error("❌ Informe o destino do material")
+                        st.stop()
+                    if not material_responsavel or material_responsavel.strip() == "":
+                        st.error("❌ Informe o responsável pela saída")
+                        st.stop()
+                
                 st.session_state.processing = True
                 now = get_sao_paulo_time()
                 
@@ -269,7 +413,29 @@ def vehicle_access_interface():
                 
                 if success:
                     log_action("REGISTER_EXIT", f"Registrou saída para '{selected_name}'.")
-                    st.success(f"✅ {message}")
+                    
+                    # Registra material se aplicável
+                    if saida_com_material and material_item:
+                        material_data = [
+                            material_item,
+                            str(material_qtd),
+                            material_destino.strip(),
+                            material_responsavel.strip()
+                        ]
+                        
+                        if sheet_operations.adc_dados_aba(material_data, 'materials'):
+                            log_action(
+                                "SAIDA_MATERIAL",
+                                f"{material_responsavel.strip()} levou {material_qtd}x {material_item} para {material_destino.strip()}"
+                            )
+                            
+                            st.success(f"✅ {message}")
+                            st.info(f"📦 Material registrado: {material_qtd}x {material_item} → {material_destino.strip()}")
+                        else:
+                            st.warning("⚠️ Saída registrada, mas houve erro ao registrar o material")
+                    else:
+                        st.success(f"✅ {message}")
+                    
                     clear_access_cache()
                     st.session_state.processing = False
                     st.rerun()
