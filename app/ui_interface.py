@@ -8,8 +8,11 @@ from app.data_operations import (
     check_blocked_records,
     is_entity_blocked,
     check_briefing_needed,
-    update_schedule_status
+    update_schedule_status,
+    add_record_with_queue,
+    update_exit_time_with_queue
 )
+from app.request_queue import RequestQueue, RequestType, RequestPriority, AUTO_APPROVE_SECONDS
 from app.operations import SheetOperations
 from app.utils import (
     format_cpf, 
@@ -102,7 +105,7 @@ def show_scheduled_today(sheet_ops):
             with col3:
                 if st.button("Registrar Chegada", key=f"checkin_{schedule_id}", use_container_width=True, type="primary"):
                     now = get_sao_paulo_time()
-                    if add_record(
+                    request_id = add_record_with_queue(
                         name=visitor_name,
                         cpf=schedule['VisitorCPF'],
                         placa="",
@@ -113,10 +116,13 @@ def show_scheduled_today(sheet_ops):
                         status="Autorizado",
                         motivo="Visita Agendada",
                         aprovador=schedule['AuthorizedBy'],
-                        first_reg_date="" 
-                    ):
+                        first_reg_date="",
+                        priority=RequestPriority.NORMAL
+                    )
+                    if request_id:
                         if update_schedule_status(schedule_id, "Realizado", now.strftime("%H:%M")):
-                            st.success(f"Chegada de {visitor_name} registrada com sucesso!")
+                            st.success(f"✅ Operação adicionada à fila! Será processada automaticamente em {AUTO_APPROVE_SECONDS} segundos.")
+                            st.info(f"ID da requisição: {request_id[-8:]}")
                             log_action("CHECK_IN", f"Check-in realizado para a visita agendada de '{visitor_name}'.")
                             clear_access_cache()
                             st.rerun()
@@ -285,16 +291,18 @@ def process_exit_with_material(person_name, record_id, sheet_ops, item, qtd, des
     st.session_state.processing = True
     now = get_sao_paulo_time()
     
-    success, message = update_exit_time(
+    success, message = update_exit_time_with_queue(
         person_name, 
         now.strftime("%d/%m/%Y"), 
-        now.strftime("%H:%M")
+        now.strftime("%H:%M"),
+        priority=RequestPriority.NORMAL
     )
     
     if success:
-        log_action("REGISTER_EXIT", f"Registrou saída para '{person_name}'.")
-        
-        # Registra o material
+        st.success(f"✅ Saída registrada na fila! {message}")
+
+        # TODO: The material registration should also be queued if the exit is queued.
+        # For now, we register it directly.
         material_registro = [item, str(qtd), destino, responsavel]
         
         if sheet_ops.adc_dados_aba(material_registro, 'materials'):
@@ -302,10 +310,9 @@ def process_exit_with_material(person_name, record_id, sheet_ops, item, qtd, des
                 "SAIDA_MATERIAL",
                 f"{responsavel} levou {qtd}x {item} para {destino}"
             )
-            st.success(f"✅ Saída de {person_name} registrada!")
             st.info(f"📦 Material: {qtd}x {item} → {destino}")
         else:
-            st.warning("⚠️ Saída registrada, mas houve erro ao registrar o material")
+            st.warning("⚠️ Houve erro ao registrar o material")
         
         cleanup_exit_session_state(record_id)
         clear_access_cache()
@@ -321,15 +328,15 @@ def process_exit_without_material(person_name, record_id):
     st.session_state.processing = True
     now = get_sao_paulo_time()
     
-    success, message = update_exit_time(
+    success, message = update_exit_time_with_queue(
         person_name, 
         now.strftime("%d/%m/%Y"), 
-        now.strftime("%H:%M")
+        now.strftime("%H:%M"),
+        priority=RequestPriority.NORMAL
     )
     
     if success:
-        log_action("REGISTER_EXIT", f"Registrou saída para '{person_name}'.")
-        st.success(f"✅ Saída de {person_name} registrada!")
+        st.success(f"✅ Saída registrada na fila! {message}")
         
         cleanup_exit_session_state(record_id)
         clear_access_cache()
@@ -500,23 +507,26 @@ def vehicle_access_interface():
                             now = get_sao_paulo_time()
                             placa_formatada = format_placa(placa) if placa else ""
                             
-                            if add_record(
-                                name=selected_name, 
+                            request_id = add_record_with_queue(
+                                name=selected_name,
                                 cpf=str(latest_record.get("CPF", "")),
-                                placa=placa_formatada, 
+                                placa=placa_formatada,
                                 marca_carro=str(latest_record.get("Marca do Carro", "")),
-                                horario_entrada=now.strftime("%H:%M"), 
-                                data=now.strftime("%d/%m/%Y"), 
-                                empresa=result_empresa, 
-                                status="Autorizado", 
-                                motivo="", 
-                                aprovador=aprovador, 
-                                first_reg_date=""
-                            ):
-                                log_action("REGISTER_ENTRY", f"Registrou nova entrada para '{selected_name}'. Placa: {placa_formatada}. Aprovador: {aprovador} (confirmado ciente)")
-                                st.success(f"✅ Nova entrada de {selected_name} registrada e autorizada por {aprovador}!")
+                                horario_entrada=now.strftime("%H:%M"),
+                                data=now.strftime("%d/%m/%Y"),
+                                empresa=result_empresa,
+                                status="Autorizado",
+                                motivo="",
+                                aprovador=aprovador,
+                                first_reg_date="",
+                                priority=RequestPriority.NORMAL
+                            )
+
+                            if request_id:
+                                st.success(f"✅ Operação adicionada à fila! Será processada automaticamente em {AUTO_APPROVE_SECONDS} segundos.")
+                                st.info(f"ID da requisição: {request_id[-8:]}")
                                 clear_access_cache()
-                            
+
                             st.session_state.processing = False
                             st.rerun()
         
@@ -606,22 +616,24 @@ def vehicle_access_interface():
                             st.session_state.processing = True
                             now = get_sao_paulo_time()
                             
-                            if add_record(
-                                name=clean_data['name'], 
-                                cpf=clean_data['cpf'], 
-                                placa=clean_data['placa'], 
-                                marca_carro=marca_carro.strip() if marca_carro else "", 
-                                horario_entrada=now.strftime("%H:%M"), 
-                                data=now.strftime("%d/%m/%Y"), 
-                                empresa=clean_data['empresa'], 
-                                status="Autorizado", 
-                                motivo="", 
-                                aprovador=aprovador, 
-                                first_reg_date=now.strftime("%d/%m/%Y")
-                            ):
-                                log_action("CREATE_RECORD", f"Cadastrou novo visitante: '{clean_data['name']}'. Aprovador: {aprovador} (confirmado ciente)")
-                                st.success(f"✅ Novo registro para {clean_data['name']} criado com sucesso e autorizado por {aprovador}!")
-                                
+                            request_id = add_record_with_queue(
+                                name=clean_data['name'],
+                                cpf=clean_data['cpf'],
+                                placa=clean_data['placa'],
+                                marca_carro=marca_carro.strip() if marca_carro else "",
+                                horario_entrada=now.strftime("%H:%M"),
+                                data=now.strftime("%d/%m/%Y"),
+                                empresa=clean_data['empresa'],
+                                status="Autorizado",
+                                motivo="",
+                                aprovador=aprovador,
+                                first_reg_date=now.strftime("%d/%m/%Y"),
+                                priority=RequestPriority.NORMAL
+                            )
+
+                            if request_id:
+                                st.success(f"✅ Operação adicionada à fila! Será processada automaticamente em {AUTO_APPROVE_SECONDS} segundos.")
+                                st.info(f"ID da requisição: {request_id[-8:]}")
                                 # Reseta rate limit em caso de sucesso
                                 RateLimiter.reset_rate_limit(user_id, 'create_record')
                                 
@@ -809,15 +821,18 @@ def process_exit_with_material_individual(person_name, sheet_ops, item, qtd, des
     st.session_state.processing = True
     now = get_sao_paulo_time()
     
-    success, message = update_exit_time(
+    success, message = update_exit_time_with_queue(
         person_name,
         now.strftime("%d/%m/%Y"),
-        now.strftime("%H:%M")
+        now.strftime("%H:%M"),
+        priority=RequestPriority.NORMAL
     )
     
     if success:
-        log_action("REGISTER_EXIT", f"Registrou saída para '{person_name}'.")
-        
+        st.success(f"✅ Saída registrada na fila! {message}")
+
+        # TODO: The material registration should also be queued if the exit is queued.
+        # For now, we register it directly.
         material_registro = [item, str(qtd), destino, responsavel]
         
         if sheet_ops.adc_dados_aba(material_registro, 'materials'):
@@ -825,10 +840,9 @@ def process_exit_with_material_individual(person_name, sheet_ops, item, qtd, des
                 "SAIDA_MATERIAL",
                 f"{responsavel} levou {qtd}x {item} para {destino}"
             )
-            st.success(f"✅ Saída de {person_name} registrada!")
             st.info(f"📦 Material: {qtd}x {item} → {destino}")
         else:
-            st.warning("⚠️ Saída registrada, mas houve erro ao registrar o material")
+            st.warning("⚠️ Houve erro ao registrar o material")
         
         cleanup_exit_session_state_individual()
         clear_access_cache()
@@ -844,15 +858,15 @@ def process_exit_without_material_individual(person_name):
     st.session_state.processing = True
     now = get_sao_paulo_time()
     
-    success, message = update_exit_time(
+    success, message = update_exit_time_with_queue(
         person_name,
         now.strftime("%d/%m/%Y"),
-        now.strftime("%H:%M")
+        now.strftime("%H:%M"),
+        priority=RequestPriority.NORMAL
     )
     
     if success:
-        log_action("REGISTER_EXIT", f"Registrou saída para '{person_name}'.")
-        st.success(f"✅ Saída de {person_name} registrada!")
+        st.success(f"✅ Saída registrada na fila! {message}")
         
         cleanup_exit_session_state_individual()
         clear_access_cache()

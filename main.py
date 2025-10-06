@@ -10,6 +10,8 @@ from app.admin_page import admin_page
 from app.summary_page import summary_page 
 from app.scheduling_page import scheduling_page
 from app.security import SessionSecurity
+from app.queue_dashboard import show_queue_dashboard
+from app.request_queue import RequestQueue
 
 st.set_page_config(page_title="Controle de Acesso BAERI", layout="wide")
 
@@ -51,6 +53,13 @@ def main():
             st.rerun()
 
 
+        # Inicializa a fila
+        RequestQueue.initialize()
+    
+        # Executa verificação em background
+        RequestQueue.run_background_check()
+
+
         user_role = get_user_role()
 
         if user_role is None:
@@ -68,14 +77,26 @@ def main():
         
         page_options = []
         if user_role == 'admin':
-            page_options.extend(["Controle de Acesso", "Agendar Visita", "Painel Administrativo", "Resumo"])
+            page_options.extend([
+                "Controle de Acesso",
+                "Fila de Requisições",
+                "Agendar Visita",
+                "Painel Administrativo",
+                "Resumo"
+            ])
         elif user_role == 'operacional':
-            page_options.extend(["Controle de Acesso", "Resumo"])
+            page_options.extend([
+                "Controle de Acesso",
+                "Fila de Requisições",
+                "Resumo"
+            ])
         
         page = st.sidebar.selectbox("Escolha a página:", page_options)
         
         if page == "Controle de Acesso":
             vehicle_access_interface()
+        elif page == "Fila de Requisições":
+            show_queue_dashboard()
         elif page == "Agendar Visita":
             scheduling_page()    
         elif page == "Painel Administrativo" and user_role == 'admin':

@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from app.operations import SheetOperations
 from app.logger import log_action
 from app.utils import get_sao_paulo_time
+from app.request_queue import RequestQueue, RequestType, RequestPriority, AUTO_APPROVE_SECONDS
 
 
 def load_data_from_sheets():
@@ -534,3 +535,78 @@ def check_briefing_needed(person_name, df):
     except Exception as e:
         print(f"Erro em check_briefing_needed: {e}")
         return False, "Erro ao verificar briefing"
+
+def add_record_with_queue(name, cpf, placa, marca_carro, horario_entrada, data, empresa, status, motivo, aprovador, first_reg_date="", priority=RequestPriority.NORMAL):
+    """
+    Adiciona registro à fila. Se Normal, aguarda aprovação automática.
+    Se Alta/Urgente, requer aprovação manual.
+    """
+    
+    # Callback que será executado quando aprovado
+    def persist_to_sheets(data):
+        return add_record(
+            data['name'], data['cpf'], data['placa'], 
+            data['marca_carro'], data['horario_entrada'],
+            data['data'], data['empresa'], data['status'],
+            data['motivo'], data['aprovador'], data['first_reg_date']
+        )
+    
+    request_data = {
+        'name': name,
+        'cpf': cpf,
+        'placa': placa,
+        'marca_carro': marca_carro,
+        'horario_entrada': horario_entrada,
+        'data': data,
+        'empresa': empresa,
+        'status': status,
+        'motivo': motivo,
+        'aprovador': aprovador,
+        'first_reg_date': first_reg_date,
+        'person_name': name  # Para exibição
+    }
+    
+    # Determina se vai para fila ou direto para sheets
+    if priority in [RequestPriority.HIGH, RequestPriority.URGENT]:
+        # Crítico: vai direto para sheets mas marca como pendente de aprovação
+        return add_record(name, cpf, placa, marca_carro, horario_entrada, data, empresa, "Pendente de Aprovação", motivo, aprovador, first_reg_date)
+    else:
+        # Normal: vai para fila
+        request_id = RequestQueue.add_request(
+            RequestType.ENTRY,
+            priority,
+            request_data,
+            callback_on_approve=persist_to_sheets
+        )
+        return request_id
+
+
+def update_exit_time_with_queue(name, exit_date_str, exit_time_str, priority=RequestPriority.NORMAL):
+    """Registra saída na fila"""
+    
+    def persist_exit(data):
+        success, message = update_exit_time(
+            data['name'],
+            data['exit_date'],
+            data['exit_time']
+        )
+        return success
+    
+    request_data = {
+        'name': name,
+        'exit_date': exit_date_str,
+        'exit_time': exit_time_str,
+        'person_name': name
+    }
+    
+    if priority == RequestPriority.NORMAL:
+        request_id = RequestQueue.add_request(
+            RequestType.EXIT,
+            priority,
+            request_data,
+            callback_on_approve=persist_exit
+        )
+        return True, f"Saída registrada na fila (ID: {request_id})"
+    else:
+        # Crítico: executa direto
+        return update_exit_time(name, exit_date_str, exit_time_str)
