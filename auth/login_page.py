@@ -39,7 +39,26 @@ def show_login_page():
 
 def show_user_header():
     """Mostra o cabeçalho com informações do usuário"""
-    st.write(f"Bem-vindo, {get_user_display_name()}!")
+    from auth.auth_utils import get_user_email, get_user_role
+    
+    user_name = get_user_display_name()
+    user_email = get_user_email()
+    user_role = get_user_role()
+    
+    # Tradução de papéis
+    role_display = {
+        'admin': 'Administrador',
+        'operacional': 'Operacional'
+    }.get(user_role, user_role)
+    
+    col1, col2 = st.columns([3, 1])
+    
+    with col1:
+        st.write(f"Bem-vindo, **{user_name}**!")
+    
+    with col2:
+        if user_role:
+            st.caption(f"🔑 {role_display}")
 
 def show_logout_button():
     """Mostra o botão de logout no sidebar"""

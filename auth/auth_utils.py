@@ -62,13 +62,14 @@ def get_user_email():
         return None
 
 def get_user_display_name():
-    """Retorna o nome de exibição do usuário logado (agora prioriza email)."""
+    """Retorna o nome de exibição do usuário logado (prioriza nome, fallback para email)."""
     try:
-        email = get_user_email()
-        if email:
-            return email
-        elif hasattr(st.user, 'name') and st.user.name:
+        # Prioriza o nome do usuário
+        if hasattr(st.user, 'name') and st.user.name:
             return st.user.name
+        # Se não tiver nome, usa o email como fallback
+        elif hasattr(st.user, 'email') and st.user.email:
+            return st.user.email
         return "Usuário Desconhecido"
     except Exception:
         return "Usuário Desconhecido"
