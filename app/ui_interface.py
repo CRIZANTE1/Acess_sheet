@@ -48,6 +48,21 @@ def request_blocklist_override_dialog(name, company):
                 first_reg_date=""
             ):
                 log_action("REQUEST_BLOCKLIST_OVERRIDE", f"Solicitou liberação da blocklist para '{name}'. Motivo: {reason.strip()}")
+                
+                # NOVO: Notifica administradores sobre a solicitação urgente
+                try:
+                    from app.notifications import send_notification
+                    import logging
+                    send_notification(
+                        "blocklist_override",
+                        person_name=name,
+                        company=company,
+                        reason=reason.strip(),
+                        requester=requester_name
+                    )
+                except Exception as e:
+                    logging.error(f"Erro ao enviar notificação de desbloqueio: {e}")
+                
                 st.success("Sua solicitação excepcional foi enviada para o administrador.")
                 clear_access_cache()
                 st.rerun()

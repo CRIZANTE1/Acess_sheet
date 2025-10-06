@@ -1,0 +1,19 @@
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: '3.9'
+      - name: Deploy to Streamlit Cloud
+        uses: streamlit/streamlit-deploy-action@v0.0.9
+        with:
+          # Segredos do seu repositório no GitHub
+          secrets: |
+            [email]
+            gmail_user = "${{ secrets.GMAIL_USER }}"
+            gmail_app_password = "${{ secrets.GMAIL_APP_PASSWORD }}"
+            from_name = "Sistema BAERI"
+            system_url = "${{ secrets.SYSTEM_URL }}"
+            admin_emails = '${{ secrets.ADMIN_EMAILS }}'

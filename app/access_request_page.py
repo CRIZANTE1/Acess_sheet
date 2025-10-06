@@ -124,6 +124,23 @@ def request_access_page():
                     
                     if sheet_ops.adc_dados_aba(request_data, 'access_requests'):
                         st.success("✅ Sua solicitação foi enviada com sucesso!")
+                        
+                        # NOVO: Notifica administradores
+                        try:
+                            from app.notifications import send_notification
+                            import logging
+                            send_notification(
+                                "new_access_request",
+                                requester_name=user_name,
+                                requester_email=user_email.lower(),
+                                role=desired_role,
+                                department=department.strip(),
+                                justification=justification.strip()
+                            )
+                        except Exception as e:
+                            # Não quebra o fluxo se o email falhar
+                            logging.error(f"Erro ao enviar notificação de novo acesso: {e}")
+
                         st.info("""
                         **Próximos Passos:**
                         1. Um administrador irá analisar sua solicitação

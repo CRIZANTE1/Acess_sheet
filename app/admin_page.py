@@ -156,6 +156,20 @@ def display_access_requests(sheet_ops):
                                         "APPROVE_ACCESS_REQUEST",
                                         f"Aprovou solicitação de '{request['user_email']}' para '{request['desired_role']}'"
                                     )
+                                    
+                                    # NOVO: Envia email de aprovação
+                                    try:
+                                        from app.notifications import send_notification
+                                        import logging
+                                        send_notification(
+                                            "access_approved",
+                                            to_email=request['user_email'],
+                                            user_name=request['user_name'],
+                                            role=request['desired_role']
+                                        )
+                                    except Exception as e:
+                                        logging.error(f"Erro ao enviar email de aprovação: {e}")
+                                    
                                     st.success(f"✅ Acesso aprovado para {request['user_name']}!")
                                     clear_access_cache()
                                     st.rerun()
@@ -181,6 +195,20 @@ def display_access_requests(sheet_ops):
                                     "REJECT_ACCESS_REQUEST",
                                     f"Rejeitou solicitação de '{request['user_email']}'"
                                 )
+                                
+                                # NOVO: Envia email de rejeição
+                                try:
+                                    from app.notifications import send_notification
+                                    import logging
+                                    send_notification(
+                                        "access_rejected",
+                                        to_email=request['user_email'],
+                                        user_name=request['user_name'],
+                                        reason="Sua solicitação foi analisada e não foi aprovada neste momento."
+                                    )
+                                except Exception as e:
+                                    logging.error(f"Erro ao enviar email de rejeição: {e}")
+                                
                                 st.info(f"Solicitação de {request['user_name']} foi rejeitada.")
                                 st.rerun()
     
