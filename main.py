@@ -54,9 +54,9 @@ def main():
         user_role = get_user_role()
 
         if user_role is None:
-            st.error("Acesso Negado. Seu usuário não tem permissão para usar este sistema.")
-            st.warning("Por favor, entre em contato com o administrador para solicitar seu cadastro.")
-            st.stop() 
+            from app.access_request_page import request_access_page
+            request_access_page()
+            return  # Para a execução aqui 
 
         if 'login_logged' not in st.session_state:
             log_action("LOGIN", f"Usuário acessou o sistema com papel '{user_role}'.")

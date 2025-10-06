@@ -8,7 +8,7 @@ from datetime import datetime, time
 def _load_user_roles():
     """
     Carrega e cacheia os papéis dos usuários da aba 'users' da planilha.
-    Retorna um dicionário mapeando nomes de usuário para seus papéis.
+    Retorna um dicionário mapeando emails de usuário para seus papéis.
     """
     try:
         sheet_operations = SheetOperations()
@@ -20,16 +20,17 @@ def _load_user_roles():
             
         header = users_data[0]
         try:
-            name_idx = header.index('user_name')
+            # Agora usa 'user_email' ao invés de 'user_name'
+            email_idx = header.index('user_email')
             role_idx = header.index('role')
         except ValueError:
-            st.error("A planilha 'users' precisa ter as colunas 'user_name' e 'role'. Verifique o cabeçalho.")
+            st.error("A planilha 'users' precisa ter as colunas 'user_email' e 'role'. Verifique o cabeçalho.")
             return {}
 
         user_roles = {
-            row[name_idx].strip(): row[role_idx].strip().lower() 
+            row[email_idx].strip().lower(): row[role_idx].strip().lower() 
             for row in users_data[1:] 
-            if row[name_idx].strip() and row[role_idx].strip()
+            if row[email_idx].strip() and row[role_idx].strip()
         }
         return user_roles
         
@@ -51,13 +52,23 @@ def is_user_logged_in():
     except Exception:
         return False
 
-def get_user_display_name():
-    """Retorna o nome de exibição do usuário logado."""
+def get_user_email():
+    """Retorna o email do usuário logado."""
     try:
-        if hasattr(st.user, 'name') and st.user.name:
+        if hasattr(st.user, 'email') and st.user.email:
+            return st.user.email
+        return None
+    except Exception:
+        return None
+
+def get_user_display_name():
+    """Retorna o nome de exibição do usuário logado (agora prioriza email)."""
+    try:
+        email = get_user_email()
+        if email:
+            return email
+        elif hasattr(st.user, 'name') and st.user.name:
             return st.user.name
-        elif hasattr(st.user, 'email') and st.user.email:
-            return st.user.email # Fallback para o email se o nome não estiver disponível
         return "Usuário Desconhecido"
     except Exception:
         return "Usuário Desconhecido"
@@ -70,10 +81,14 @@ def get_user_role():
     if not is_user_logged_in():
         return None
         
-    user_name = get_user_display_name()
+    user_email = get_user_email()
+    if not user_email:
+        return None
+        
     user_roles_map = _load_user_roles()
     
-    return user_roles_map.get(user_name)
+    # Busca pelo email em lowercase para evitar problemas de case
+    return user_roles_map.get(user_email.lower())
 
 def is_admin():
     """Verifica se o usuário atual tem o papel de 'admin'."""

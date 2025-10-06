@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-from auth.auth_utils import is_admin, get_user_display_name
+from auth.auth_utils import is_admin, get_user_display_name, get_user_email
 from app.security import SecurityValidator, show_security_alert
 
 from app.operations import SheetOperations
@@ -13,7 +13,8 @@ from app.data_operations import (
     remove_from_blocklist,
     get_users, 
     add_user,    
-    remove_user 
+    remove_user,
+    update_access_request_status
 )
 from app.logger import log_action
 from app.utils import clear_access_cache
@@ -24,17 +25,19 @@ def display_user_management(sheet_ops):
 
     with st.container(border=True):
         st.subheader("Adicionar Novo Usuário")
-        new_user_name = st.text_input("Nome Completo do Usuário (deve corresponder ao nome da conta Google):")
+        new_user_email = st.text_input("Email do Usuário (conta Google):", placeholder="usuario@exemplo.com")
         # Por segurança, o admin só pode adicionar usuários operacionais pela UI.
         new_user_role = "operacional"
         st.info(f"O usuário será adicionado com o papel de **{new_user_role}**.")
 
         if st.button("Adicionar Usuário", type="primary"):
-            if not new_user_name.strip():
-                st.error("O nome do usuário não pode estar vazio.")
+            if not new_user_email.strip():
+                st.error("O email do usuário não pode estar vazio.")
+            elif "@" not in new_user_email:
+                st.error("Por favor, insira um email válido.")
             else:
-                if add_user(new_user_name.strip(), new_user_role):
-                    st.success(f"Usuário '{new_user_name.strip()}' adicionado com sucesso!")
+                if add_user(new_user_email.strip().lower(), new_user_role):
+                    st.success(f"Usuário '{new_user_email.strip()}' adicionado com sucesso!")
                     clear_access_cache()
                     st.rerun()
 
@@ -53,7 +56,7 @@ def display_user_management(sheet_ops):
         else:
             users_to_remove = st.multiselect(
                 "Selecione um ou mais usuários operacionais para remover:",
-                options=operational_users['user_name'].tolist()
+                options=operational_users['user_email'].tolist()
             )
             
             if st.button("Remover Usuários Selecionados", type="secondary"):
@@ -70,6 +73,142 @@ def display_user_management(sheet_ops):
                         clear_access_cache()
                         st.rerun()
 
+def display_access_requests(sheet_ops):
+    """Gerencia solicitações de acesso de novos usuários."""
+    st.header("Solicitações de Acesso ao Sistema")
+    
+    requests_data = sheet_ops.carregar_dados_aba('access_requests')
+    
+    if not requests_data or len(requests_data) < 2:
+        st.info("Nenhuma solicitação de acesso pendente no momento.")
+        return
+    
+    df_requests = pd.DataFrame(requests_data[1:], columns=requests_data[0])
+    
+    pending_requests = df_requests[df_requests['status'] == 'Pendente'].sort_values(
+        by='request_date', ascending=False
+    )
+    
+    approved_requests = df_requests[df_requests['status'] == 'Aprovado'].sort_values(
+        by='request_date', ascending=False
+    )
+    
+    rejected_requests = df_requests[df_requests['status'] == 'Rejeitado'].sort_values(
+        by='request_date', ascending=False
+    )
+    
+    tab1, tab2, tab3 = st.tabs([
+        f"Pendentes ({len(pending_requests)})",
+        f"Aprovadas ({len(approved_requests)})",
+        f"Rejeitadas ({len(rejected_requests)})"
+    ])
+    
+    with tab1:
+        if pending_requests.empty:
+            st.success("✅ Nenhuma solicitação pendente no momento.")
+        else:
+            st.warning(f"⏳ Você tem {len(pending_requests)} solicitação(ões) para analisar.")
+            
+            for _, request in pending_requests.iterrows():
+                with st.container(border=True):
+                    col1, col2 = st.columns([2, 1])
+                    
+                    with col1:
+                        st.subheader(f"👤 {request['user_name']}")
+                        st.write(f"**Email:** {request['user_email']}")
+                        st.write(f"**Departamento:** {request['department']}")
+                        st.write(f"**Acesso Solicitado:** `{request['desired_role']}`")
+                        st.write(f"**Data da Solicitação:** {request['request_date']}")
+                        
+                        if request.get('manager_email'):
+                            st.write(f"**Gestor:** {request['manager_email']}")
+                    
+                    with col2:
+                        st.metric("Status", "⏳ Pendente", delta=None)
+                    
+                    st.write("**Justificativa:**")
+                    st.info(request['justification'])
+                    
+                    st.divider()
+                    
+                    col_approve, col_reject = st.columns(2)
+                    
+                    request_id = request['ID']
+                    
+                    with col_approve:
+                        if st.button(
+                            "✅ Aprovar Acesso",
+                            key=f"approve_req_{request_id}",
+                            use_container_width=True,
+                            type="primary"
+                        ):
+                            admin_name = get_user_display_name()
+                            
+                            # Atualiza o status da solicitação
+                            if update_access_request_status(
+                                request_id, 
+                                "Aprovado", 
+                                admin_name
+                            ):
+                                # Adiciona o usuário ao sistema
+                                if add_user(request['user_email'], request['desired_role']):
+                                    log_action(
+                                        "APPROVE_ACCESS_REQUEST",
+                                        f"Aprovou solicitação de '{request['user_email']}' para '{request['desired_role']}'"
+                                    )
+                                    st.success(f"✅ Acesso aprovado para {request['user_name']}!")
+                                    clear_access_cache()
+                                    st.rerun()
+                                else:
+                                    st.error("Erro ao adicionar usuário ao sistema.")
+                            else:
+                                st.error("Erro ao atualizar status da solicitação.")
+                    
+                    with col_reject:
+                        if st.button(
+                            "❌ Rejeitar",
+                            key=f"reject_req_{request_id}",
+                            use_container_width=True
+                        ):
+                            admin_name = get_user_display_name()
+                            
+                            if update_access_request_status(
+                                request_id,
+                                "Rejeitado",
+                                admin_name
+                            ):
+                                log_action(
+                                    "REJECT_ACCESS_REQUEST",
+                                    f"Rejeitou solicitação de '{request['user_email']}'"
+                                )
+                                st.info(f"Solicitação de {request['user_name']} foi rejeitada.")
+                                st.rerun()
+    
+    with tab2:
+        if approved_requests.empty:
+            st.info("Nenhuma solicitação aprovada ainda.")
+        else:
+            st.dataframe(
+                approved_requests[[
+                    'request_date', 'user_name', 'user_email', 
+                    'desired_role', 'department', 'reviewed_by'
+                ]],
+                use_container_width=True,
+                hide_index=True
+            )
+    
+    with tab3:
+        if rejected_requests.empty:
+            st.info("Nenhuma solicitação rejeitada.")
+        else:
+            st.dataframe(
+                rejected_requests[[
+                    'request_date', 'user_name', 'user_email',
+                    'desired_role', 'department', 'reviewed_by'
+                ]],
+                use_container_width=True,
+                hide_index=True
+            )
 
 def display_pending_requests(sheet_ops):
     """Lida com a lógica da aba de Aprovações Pendentes."""
@@ -255,15 +394,23 @@ def admin_page():
     st.title("Painel Administrativo")
     sheet_ops = SheetOperations()
     
-    tab1, tab2, tab3, tab4 = st.tabs(["Aprovações Pendentes", "Gerenciar Bloqueios", "Gerenciar Usuários", "Logs do Sistema"])
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+        "Solicitações de Acesso",  # NOVA ABA
+        "Aprovações Pendentes",
+        "Gerenciar Bloqueios",
+        "Gerenciar Usuários",
+        "Logs do Sistema"
+    ])
 
     with tab1:
-        display_pending_requests(sheet_ops)
+        display_access_requests(sheet_ops)  # NOVA FUNÇÃO
     with tab2:
-        display_blocklist_management(sheet_ops)
+        display_pending_requests(sheet_ops)
     with tab3:
-        display_user_management(sheet_ops) 
+        display_blocklist_management(sheet_ops)
     with tab4:
+        display_user_management(sheet_ops) 
+    with tab5:
         display_logs(sheet_ops)
         
     st.divider()
@@ -276,12 +423,9 @@ def admin_page():
         st.subheader("Status do Sistema")
         st.json({
             "sistema": "Controle de Acesso de Pessoas e Veículos",
-            "versão": "2.8.0", 
+            "versão": "3.0.0", 
             "modo_login": "OIDC (OpenID Connect) com níveis via Google Sheets",
             "status": "Operacional",
             "Developer": "Cristian Ferreira Carlos",
             "Data": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         })
-    
-
-

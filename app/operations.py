@@ -87,6 +87,19 @@ class SheetOperations:
                     aba.update_row(1, ["Timestamp", "User", "Action", "Details"])
                 elif aba_name == 'schedules':
                     aba.update_row(1, ["ID", "VisitorName", "VisitorCPF", "Company", "ScheduledDate", "ScheduledTime", "AuthorizedBy", "Status", "CheckInTime"])
+                elif aba_name == 'access_requests':
+                    aba.update_row(1, [
+                        "ID",
+                        "user_email",
+                        "user_name",
+                        "desired_role",
+                        "department",
+                        "justification",
+                        "manager_email",
+                        "request_date",
+                        "status",
+                        "reviewed_by"
+                    ])
             
             all_values = aba.get_all_values()
             existing_ids = [row[0] for row in all_values[1:] if row and row[0]]

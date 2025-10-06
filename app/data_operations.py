@@ -397,30 +397,74 @@ def get_users():
         st.error(f"Erro ao carregar a lista de usuários: {e}")
         return pd.DataFrame()
 
-def add_user(user_name, role):
+def add_user(user_email, role):
     """Adiciona um novo usuário à planilha 'users'."""
     try:
         sheet_ops = SheetOperations()
      
-        new_user_data = [user_name, role]
+        new_user_data = [user_email.lower(), role]
         if sheet_ops.adc_dados_aba(new_user_data, 'users'):
-            log_action("ADD_USER", f"Adicionou usuário '{user_name}' com o papel '{role}'.")
+            log_action("ADD_USER", f"Adicionou usuário '{user_email}' com o papel '{role}'.")
             return True
         return False
     except Exception as e:
         st.error(f"Erro ao adicionar usuário: {e}")
         return False
 
-def remove_user(user_name):
-    """Remove um usuário da planilha 'users' pelo nome."""
+def remove_user(user_email):
+    """Remove um usuário da planilha 'users' pelo email."""
     try:
         sheet_ops = SheetOperations()
-        if sheet_ops.excluir_linha_por_valor(user_name, 'user_name', 'users'):
-            log_action("REMOVE_USER", f"Removeu o usuário '{user_name}'.")
+        if sheet_ops.excluir_linha_por_valor(user_email.lower(), 'user_email', 'users'):
+            log_action("REMOVE_USER", f"Removeu o usuário '{user_email}'.")
             return True
         return False
     except Exception as e:
         st.error(f"Erro ao remover usuário: {e}")
+        return False
+
+def update_access_request_status(request_id, new_status, reviewer_name):
+    """
+    Atualiza o status de uma solicitação de acesso.
+    
+    Args:
+        request_id: ID da solicitação
+        new_status: Novo status (Aprovado ou Rejeitado)
+        reviewer_name: Nome do revisor
+    
+    Returns:
+        bool: True se sucesso, False caso contrário
+    """
+    try:
+        sheet_ops = SheetOperations()
+        all_requests = sheet_ops.carregar_dados_aba('access_requests')
+        
+        if not all_requests or len(all_requests) < 2:
+            st.error("Não foi possível carregar as solicitações.")
+            return False
+        
+        header = all_requests[0]
+        
+        original_row_list = next(
+            (row for row in all_requests if str(row[0]) == str(request_id)),
+            None
+        )
+        
+        if not original_row_list:
+            return False
+        
+        updated_data = original_row_list[1:]  # Dados sem ID
+        
+        status_idx = header.index('status')
+        reviewed_idx = header.index('reviewed_by')
+        
+        updated_data[status_idx - 1] = new_status
+        updated_data[reviewed_idx - 1] = reviewer_name
+        
+        return sheet_ops.editar_dados_aba(request_id, updated_data, 'access_requests')
+        
+    except Exception as e:
+        st.error(f"Erro ao atualizar status da solicitação: {e}")
         return False
 
 def update_schedule_status(schedule_id, new_status, checkin_time):
@@ -490,32 +534,3 @@ def check_briefing_needed(person_name, df):
     except Exception as e:
         print(f"Erro em check_briefing_needed: {e}")
         return False, "Erro ao verificar briefing"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

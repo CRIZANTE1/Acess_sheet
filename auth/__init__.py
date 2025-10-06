@@ -2,9 +2,9 @@ from .auth_utils import (
     is_oidc_available,
     is_user_logged_in,
     get_user_display_name,
+    get_user_email,
     get_user_role,
     is_admin
-    
 )
 
 from .login_page import (
