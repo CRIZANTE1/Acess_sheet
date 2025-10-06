@@ -400,6 +400,19 @@ def display_logs(sheet_ops):
 def display_testing_page():
     """Lida com a lógica da aba de Testes para administradores."""
     st.header("Página de Testes e Diagnósticos")
+
+    # NOVO BLOCO DE DIAGNÓSTICO
+    with st.expander("🔍 Diagnóstico de Segredos Ativos"):
+        st.write("Abaixo estão os segredos que a aplicação está recebendo.")
+        st.write("Verifique se a seção '[email]' e suas chaves estão presentes e corretas.")
+        
+        # Isso vai imprimir de forma segura o que está configurado
+        try:
+            secrets_dict = st.secrets.to_dict()
+            st.json(secrets_dict)
+        except Exception as e:
+            st.error(f"Não foi possível ler os segredos: {e}")
+
     st.warning("Esta página é para administradores testarem funcionalidades do sistema. As ações aqui podem enviar notificações reais.")
 
     # --- Teste de Conexão e Envio Direto de Email ---
