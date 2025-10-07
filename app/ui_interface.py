@@ -26,6 +26,18 @@ from auth.auth_utils import get_user_display_name, is_admin
 from app.logger import log_action
 
 
+def cleanup_all_exit_states():
+    """Limpa todos os estados de saída para evitar loops."""
+    keys_to_check = list(st.session_state.keys())
+    for key in keys_to_check:
+        if key.startswith('exit_') or key.startswith('material_') or key.startswith('mat_'):
+            del st.session_state[key]
+    
+    # Reseta flag de processamento
+    if 'processing' in st.session_state:
+        st.session_state.processing = False
+
+
 @st.dialog("Solicitar Liberação Excepcional")
 def request_blocklist_override_dialog(name, company):
     """Um diálogo para solicitar a liberação de alguém na blocklist."""
@@ -174,13 +186,22 @@ def show_people_inside(df, sheet_operations):
         with col2: 
             st.caption(f"Entrada: {row['Data']} às {row['Horário de Entrada']}")
         with col3:
-            if st.button("Sair", key=f"exit_{record_id}", use_container_width=True, disabled=st.session_state.get('processing', False)):
+            # CORREÇÃO: Verifica se já está processando ANTES de mostrar o botão
+            is_processing_this = st.session_state.get(f'exit_clicked_{record_id}', False)
+            
+            if st.button(
+                "Sair", 
+                key=f"exit_{record_id}", 
+                use_container_width=True, 
+                disabled=st.session_state.get('processing', False) or is_processing_this
+            ):
                 st.session_state[f'exit_clicked_{record_id}'] = True
                 st.session_state[f'exit_person_name_{record_id}'] = person_name
                 st.rerun()
         
-        # Verifica se o botão de saída foi clicado para esta pessoa
-        if st.session_state.get(f'exit_clicked_{record_id}', False):
+        # CORREÇÃO: Só mostra o dialog se o botão foi clicado E ainda não foi processado
+        if st.session_state.get(f'exit_clicked_{record_id}', False) and \
+           not st.session_state.get(f'exit_processed_{record_id}', False):
             show_material_confirmation_dialog(record_id, person_name, row, sheet_operations)
 
 
@@ -288,7 +309,13 @@ def cleanup_exit_session_state(record_id):
     keys_to_delete = [
         f'exit_clicked_{record_id}',
         f'exit_person_name_{record_id}',
-        f'material_choice_{record_id}'
+        f'material_choice_{record_id}',
+        f'exit_processed_{record_id}',  # NOVO: flag de processamento
+        # Limpa também os campos do formulário de material
+        f'mat_item_{record_id}',
+        f'mat_qtd_{record_id}',
+        f'mat_dest_{record_id}',
+        f'mat_resp_{record_id}'
     ]
     for key in keys_to_delete:
         if key in st.session_state:
@@ -297,7 +324,10 @@ def cleanup_exit_session_state(record_id):
 
 def process_exit_with_material(person_name, record_id, sheet_ops, item, qtd, destino, responsavel):
     """Processa a saída de uma pessoa com material."""
+    # CORREÇÃO: Marca como processado ANTES de iniciar
+    st.session_state[f'exit_processed_{record_id}'] = True
     st.session_state.processing = True
+    
     now = get_sao_paulo_time()
     
     success, message = update_exit_time(
@@ -318,22 +348,31 @@ def process_exit_with_material(person_name, record_id, sheet_ops, item, qtd, des
                 f"{responsavel} levou {qtd}x {item} para {destino}"
             )
             st.success(f"✅ Saída de {person_name} registrada!")
-            st.info(f"📦 Material: {qtd}x {item} → {destino}")
+            st.info(f" Material: {qtd}x {item} → {destino}")
         else:
             st.warning("⚠️ Saída registrada, mas houve erro ao registrar o material")
         
+        # CORREÇÃO: Limpa TUDO antes de rerun
         cleanup_exit_session_state(record_id)
         clear_access_cache()
         st.session_state.processing = False
+        
+        # AGUARDA um momento antes do rerun para garantir que o estado foi limpo
+        import time
+        time.sleep(0.1)
         st.rerun()
     else:
         st.error(f"❌ {message}")
         st.session_state.processing = False
+        st.session_state[f'exit_processed_{record_id}'] = False
 
 
 def process_exit_without_material(person_name, record_id):
     """Processa a saída de uma pessoa sem material."""
+    # CORREÇÃO: Marca como processado ANTES de iniciar
+    st.session_state[f'exit_processed_{record_id}'] = True
     st.session_state.processing = True
+    
     now = get_sao_paulo_time()
     
     success, message = update_exit_time(
@@ -346,17 +385,28 @@ def process_exit_without_material(person_name, record_id):
         log_action("REGISTER_EXIT", f"Registrou saída para '{person_name}'.")
         st.success(f"✅ Saída de {person_name} registrada!")
         
+        # CORREÇÃO: Limpa TUDO antes de rerun
         cleanup_exit_session_state(record_id)
         clear_access_cache()
         st.session_state.processing = False
+        
+        # AGUARDA um momento antes do rerun
+        import time
+        time.sleep(0.1)
         st.rerun()
     else:
         st.error(f"❌ {message}")
         st.session_state.processing = False
+        st.session_state[f'exit_processed_{record_id}'] = False
 
 def vehicle_access_interface():
     """Renderiza a interface principal de controle de acesso."""
     st.title("Controle de Acesso BAERI")
+    
+    # NOVO: Limpa estados órfãos ao carregar a página
+    if st.session_state.get('force_cleanup', False):
+        cleanup_all_exit_states()
+        st.session_state.force_cleanup = False
     
     if 'processing' not in st.session_state:
         st.session_state.processing = False
@@ -834,7 +884,13 @@ def cleanup_exit_session_state_individual():
     keys_to_delete = [
         'exit_clicked_individual',
         'exit_person_name_individual',
-        'material_choice_individual'
+        'material_choice_individual',
+        'exit_processed_individual',  # NOVO
+        # Limpa campos do formulário
+        'mat_item_individual',
+        'mat_qtd_individual',
+        'mat_dest_individual',
+        'mat_resp_individual'
     ]
     for key in keys_to_delete:
         if key in st.session_state:
@@ -842,6 +898,7 @@ def cleanup_exit_session_state_individual():
 
 def process_exit_with_material_individual(person_name, sheet_ops, item, qtd, destino, responsavel):
     """Processa saída individual com material."""
+    st.session_state.exit_processed_individual = True  # NOVO
     st.session_state.processing = True
     now = get_sao_paulo_time()
     
@@ -862,21 +919,26 @@ def process_exit_with_material_individual(person_name, sheet_ops, item, qtd, des
                 f"{responsavel} levou {qtd}x {item} para {destino}"
             )
             st.success(f"✅ Saída de {person_name} registrada!")
-            st.info(f"📦 Material: {qtd}x {item} → {destino}")
+            st.info(f" Material: {qtd}x {item} → {destino}")
         else:
             st.warning("⚠️ Saída registrada, mas houve erro ao registrar o material")
         
         cleanup_exit_session_state_individual()
         clear_access_cache()
         st.session_state.processing = False
+        
+        import time
+        time.sleep(0.1)
         st.rerun()
     else:
         st.error(f"❌ {message}")
         st.session_state.processing = False
+        st.session_state.exit_processed_individual = False
 
 
 def process_exit_without_material_individual(person_name):
     """Processa saída individual sem material."""
+    st.session_state.exit_processed_individual = True # NOVO
     st.session_state.processing = True
     now = get_sao_paulo_time()
     
@@ -893,7 +955,11 @@ def process_exit_without_material_individual(person_name):
         cleanup_exit_session_state_individual()
         clear_access_cache()
         st.session_state.processing = False
+        
+        import time
+        time.sleep(0.1)
         st.rerun()
     else:
         st.error(f"❌ {message}")
         st.session_state.processing = False
+        st.session_state.exit_processed_individual = False
