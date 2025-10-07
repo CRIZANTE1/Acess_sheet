@@ -93,8 +93,7 @@ def request_access_page():
             
             submit_button = st.form_submit_button(
                 "Enviar Solicitação",
-                type="primary",
-                disabled=not terms_accepted
+                type="primary"
             )
             
             if submit_button:
