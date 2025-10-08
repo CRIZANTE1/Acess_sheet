@@ -102,16 +102,16 @@ def is_operacional():
 def _get_shift(dt_object):
     """
     Determina o turno com base em um objeto datetime.
-    - Turno 1 (Diurno): 07:00:00 - 18:59:59
-    - Turno 2 (Noturno): 19:00:00 - 06:59:59
+    - Turno 1 (Diurno): 07:00:00 - 18:58:59
+    - Turno 2 (Noturno): 18:59:00 - 06:59:59
     Retorna 1 ou 2.
     """
     seven_am = time(7, 0, 0)
-    seven_pm = time(19, 0, 0)
+    six_fifty_nine_pm = time(18, 59, 0)
     
     current_time_obj = dt_object.time()
     
-    if seven_am <= current_time_obj < seven_pm:
+    if seven_am <= current_time_obj < six_fifty_nine_pm:
         return 1  
     else:
         return 2  

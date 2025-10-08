@@ -99,8 +99,8 @@ def request_access_page():
             if submit_button:
                 if not justification.strip():
                     st.error("❌ A justificativa é obrigatória.")
-                elif len(justification.strip()) < 20:
-                    st.error("❌ A justificativa deve ter pelo menos 20 caracteres.")
+                elif len(justification.strip()) < 10:
+                    st.error("❌ A justificativa deve ter pelo menos 10 caracteres.")
                 elif not department.strip():
                     st.error("❌ O departamento/setor é obrigatório.")
                 elif not terms_accepted:

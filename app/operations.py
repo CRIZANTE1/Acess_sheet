@@ -130,7 +130,7 @@ class SheetOperations:
                     break
 
             new_data.insert(0, new_id)
-            aba.append_table(values=new_data)
+            aba.append_table(values=[new_data])
             logging.info(f"Dados adicionados com sucesso à aba '{aba_name}'.")
             return True
         except Exception as e:
